@@ -5,11 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🪙 Unicity Coin Flip</title>
   <style>
+    :root {
+      --bg: #0D0D0D;
+      --card-bg: #1A1A1A;
+      --card-bg-2: #2A2A2A;
+      --border: #2A2A2A;
+      --orange: #F97316;
+      --orange-dark: #FF6F00;
+      --orange-light: #FFB347;
+      --text: #F5F5F5;
+      --text-dim: #9CA3AF;
+      --text-faint: #6B7280;
+      --green: #059669;
+      --green-light: #34D399;
+      --red: #DC2626;
+      --red-light: #F87171;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #0d0d1a;
-      color: #e0e0ff;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -19,28 +35,28 @@
     h1 {
       font-size: 2.2rem;
       margin: 20px 0 4px;
-      background: linear-gradient(90deg, #a78bfa, #60a5fa);
+      background: linear-gradient(90deg, var(--orange-dark), var(--orange-light));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .subtitle { color: #6b7280; font-size: 0.9rem; margin-bottom: 30px; }
+    .subtitle { color: var(--text-faint); font-size: 0.9rem; margin-bottom: 30px; }
     .card {
-      background: #13132b;
-      border: 1px solid #2a2a4a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 16px;
       padding: 24px;
       width: 100%;
       max-width: 520px;
       margin-bottom: 16px;
     }
-    .card h2 { font-size: 1rem; color: #a78bfa; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
-    label { display: block; font-size: 0.8rem; color: #9ca3af; margin-bottom: 4px; margin-top: 12px; }
+    .card h2 { font-size: 1rem; color: var(--orange); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
+    label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; margin-top: 12px; }
     input {
       width: 100%; padding: 10px 14px;
-      background: #1e1e3a; border: 1px solid #3a3a5a;
-      border-radius: 8px; color: #e0e0ff; font-size: 0.95rem; outline: none;
+      background: var(--card-bg-2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none;
     }
-    input:focus { border-color: #a78bfa; }
+    input:focus { border-color: var(--orange); }
     button {
       width: 100%; padding: 12px; margin-top: 14px;
       border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
@@ -48,75 +64,90 @@
     }
     button:active { transform: scale(0.98); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; }
-    .btn-success { background: linear-gradient(135deg, #059669, #0891b2); color: white; }
+    .btn-primary {
+      background: var(--card-bg-2); border: 1px solid var(--border); color: var(--orange-light);
+    }
+    .btn-success { background: linear-gradient(135deg, var(--orange-dark), var(--orange)); color: white; }
     .btn-connect {
-      background: linear-gradient(135deg, #f97316, #ea580c);
+      background: linear-gradient(135deg, var(--orange-dark), var(--orange));
       color: white; font-size: 1.1rem; padding: 16px;
     }
     .choice-row { display: flex; gap: 10px; margin-top: 8px; }
     .choice-btn {
       flex: 1; margin-top: 0; padding: 14px;
-      background: #1e1e3a; border: 2px solid #3a3a5a; color: #9ca3af;
+      background: var(--card-bg-2); border: 2px solid var(--border); color: var(--text-dim);
       font-size: 1rem;
     }
-    .choice-btn.selected { border-color: #a78bfa; color: #e0e0ff; background: #2a2350; }
+    .choice-btn.selected { border-color: var(--orange); color: var(--text); background: #2A1B0D; }
     .status-bar {
-      background: #1e1e3a; border: 1px solid #3a3a5a;
+      background: var(--card-bg-2); border: 1px solid var(--border);
       border-radius: 8px; padding: 10px 14px;
-      font-size: 0.85rem; color: #9ca3af;
+      font-size: 0.85rem; color: var(--text-dim);
       margin-top: 12px; min-height: 40px; word-break: break-all;
     }
-    .status-bar.success { border-color: #059669; color: #34d399; }
-    .status-bar.error   { border-color: #dc2626; color: #f87171; }
-    .status-bar.info    { border-color: #4f46e5; color: #a5b4fc; }
+    .status-bar.success { border-color: var(--green); color: var(--green-light); }
+    .status-bar.error   { border-color: var(--red); color: var(--red-light); }
+    .status-bar.info    { border-color: var(--orange); color: var(--orange-light); }
     .identity-box {
       display: flex; align-items: center; gap: 10px;
-      background: #1e1e3a; border-radius: 8px; padding: 10px 14px; margin-top: 8px;
+      background: var(--card-bg-2); border-radius: 8px; padding: 10px 14px; margin-top: 8px;
     }
     .avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background: linear-gradient(135deg, #f97316, #ea580c);
+      background: linear-gradient(135deg, var(--orange-dark), var(--orange));
       display: flex; align-items: center; justify-content: center;
       font-size: 1.3rem; flex-shrink: 0;
     }
     .balance-badge {
-      display: inline-block; background: #2a2a4a;
-      border: 1px solid #f97316; border-radius: 20px;
-      padding: 4px 14px; font-size: 0.9rem; color: #fb923c; margin-top: 10px;
+      display: inline-block; background: var(--card-bg-2);
+      border: 1px solid var(--orange); border-radius: 20px;
+      padding: 4px 14px; font-size: 0.9rem; color: var(--orange-light); margin-top: 10px;
     }
     .bot-row {
       display: flex; align-items: center; justify-content: space-between;
-      background: #1e1e3a; border-radius: 8px; padding: 10px 14px; margin-top: 8px;
-      font-size: 0.85rem; color: #9ca3af;
+      background: var(--card-bg-2); border-radius: 8px; padding: 10px 14px; margin-top: 8px;
+      font-size: 0.85rem; color: var(--text-dim);
     }
-    .coin-area { display: flex; justify-content: center; margin: 24px 0; }
+    .coin-area { display: flex; justify-content: center; margin: 24px 0; perspective: 700px; }
     .coin {
-      width: 110px; height: 110px; border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, #fde68a, #d97706);
-      border: 3px solid #92400e;
+      position: relative; width: 110px; height: 110px;
+      transform-style: preserve-3d;
+      transform: rotateY(0deg);
+    }
+    .coin-face {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, var(--orange-light), var(--orange-dark));
+      border: 3px solid #7A3300;
       display: flex; align-items: center; justify-content: center;
-      font-size: 2.2rem; font-weight: 700; color: #78350f;
-      transition: transform 0.3s;
+      font-size: 2.2rem; font-weight: 700; color: #3D1F00;
+      backface-visibility: hidden;
     }
-    .coin.flipping { animation: flip 0.6s ease-in-out infinite; }
-    @keyframes flip {
-      0%,100%{transform:rotateY(0)} 50%{transform:rotateY(180deg)}
-    }
+    .coin-face.back { transform: rotateY(180deg); }
     .result-banner {
       text-align: center; padding: 14px; border-radius: 12px;
       font-size: 1.2rem; font-weight: 700; margin: 12px 0; display: none;
     }
-    .result-banner.win  { background:#05966920; border:1px solid #059669; color:#34d399; display:block; }
-    .result-banner.lose { background:#dc262620; border:1px solid #dc2626; color:#f87171; display:block; }
-    .tx-link { font-size: 0.78rem; color: #6b7280; margin-top: 6px; }
-    .tx-link a { color: #a78bfa; text-decoration: none; }
+    .result-banner.win  { background:#05966920; border:1px solid var(--green); color:var(--green-light); display:block; }
+    .result-banner.lose { background:#dc262620; border:1px solid var(--red); color:var(--red-light); display:block; }
+    .tx-link { font-size: 0.78rem; color: var(--text-faint); margin-top: 6px; }
+    .tx-link a { color: var(--orange-light); text-decoration: none; }
     .stats-row { display: flex; gap: 10px; margin-top: 8px; }
-    .stat-box { flex:1; background:#1e1e3a; border-radius:8px; padding:10px; text-align:center; }
+    .stat-box { flex:1; background:var(--card-bg-2); border-radius:8px; padding:10px; text-align:center; }
     .stat-box .val { font-size:1.4rem; font-weight:700; }
-    .stat-box .lbl { font-size:0.7rem; color:#6b7280; margin-top:2px; }
-    .val.green{color:#34d399} .val.red{color:#f87171}
-    .section-divider { border:none; border-top:1px solid #2a2a4a; margin:16px 0; }
+    .stat-box .lbl { font-size:0.7rem; color:var(--text-faint); margin-top:2px; }
+    .val.green{color:var(--green-light)} .val.red{color:var(--red-light)}
+    .history-section { margin-top: 14px; }
+    .history-title { font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+    .history-list { display:flex; gap:6px; flex-wrap:wrap; }
+    .history-item {
+      display:flex; align-items:center; gap:4px;
+      background:var(--card-bg-2); border:1px solid var(--border); border-radius:8px;
+      padding:6px 10px; font-size:0.78rem; color:var(--text-dim);
+    }
+    .history-item.win { border-color:var(--green); color:var(--green-light); }
+    .history-item.lose { border-color:var(--red); color:var(--red-light); }
+    .history-empty { font-size:0.78rem; color:var(--text-faint); }
+    .section-divider { border:none; border-top:1px solid var(--border); margin:16px 0; }
     .hidden { display: none !important; }
     .spinner {
       display:inline-block; width:14px; height:14px;
@@ -126,12 +157,12 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .extension-hint {
-      background: #1a1a0d; border: 1px solid #f97316;
+      background: #1A1209; border: 1px solid var(--orange);
       border-radius: 10px; padding: 14px; margin-top: 12px;
-      font-size: 0.85rem; color: #fb923c; line-height: 1.7;
+      font-size: 0.85rem; color: var(--orange-light); line-height: 1.7;
     }
-    footer { margin-top:30px; color:#374151; font-size:0.78rem; text-align:center; }
-    footer a { color:#6b7280; }
+    footer { margin-top:30px; color:var(--text-faint); font-size:0.78rem; text-align:center; }
+    footer a { color:var(--text-faint); }
   </style>
 </head>
 <body>
@@ -146,10 +177,10 @@
     <button class="btn-connect" id="connectBtn">🟠 Connect Sphere Wallet</button>
 
     <div class="extension-hint">
-      <strong>Sphere Wallet</strong> extension gerekli.<br>
-      Zaten kuruluysa butona tıkla → extension onay penceresi açılır → <strong>Approve</strong> de.<br>
+      <strong>Sphere Wallet</strong> extension required.<br>
+      Already installed? Click the button → an approval popup opens in the extension → click <strong>Approve</strong>.<br>
       <br>
-      Kurulu değilse: <a href="https://github.com/unicity-sphere/sphere-extension/releases" target="_blank" style="color:#f97316">GitHub Releases</a>'dan indir → Chrome'a ekle.
+      Not installed? Get it from <a href="https://github.com/unicity-sphere/sphere-extension/releases" target="_blank" style="color:var(--orange)">GitHub Releases</a> and add it to Chrome.
     </div>
 
     <div id="walletInfo" class="hidden">
@@ -157,18 +188,18 @@
         <div class="avatar">🪙</div>
         <div>
           <div id="identityLabel" style="font-weight:600; font-size:1.1rem"></div>
-          <div style="font-size:0.75rem; color:#6b7280; margin-top:2px">Sphere Wallet</div>
+          <div style="font-size:0.75rem; color:var(--text-faint); margin-top:2px">Sphere Wallet</div>
         </div>
       </div>
       <div id="balanceBadge" class="balance-badge">💰 Loading…</div>
-      <button class="btn-primary" id="refreshBalanceBtn" style="background:#1e1e3a; border:1px solid #3a3a5a; color:#a5b4fc; margin-top:10px">↻ Refresh Balance</button>
+      <button class="btn-primary" id="refreshBalanceBtn">↻ Refresh Balance</button>
       <div class="bot-row">
         <span>🤖 @dicebot balance</span>
         <span id="botBalanceBadge">Loading…</span>
       </div>
     </div>
 
-    <div class="status-bar" id="walletStatus">Sphere Wallet extension'ını bağlamak için butona tıkla.</div>
+    <div class="status-bar" id="walletStatus">Click the button to connect your Sphere Wallet extension.</div>
   </div>
 
   <!-- GAME -->
@@ -177,18 +208,21 @@
 
     <label>Bet Amount (UCT)</label>
     <input id="betInput" type="number" value="1" min="0.1" max="10" step="0.1" />
-    <small style="color:#6b7280; font-size:0.75rem; margin-top:4px; display:block">Min 0.1 UCT, max 10 UCT per flip</small>
+    <small style="color:var(--text-faint); font-size:0.75rem; margin-top:4px; display:block">Min 0.1 UCT, max 10 UCT per flip</small>
 
     <label>Your Call</label>
     <div class="choice-row">
-      <button class="choice-btn" id="headsBtn" data-choice="heads">🦅 Heads (Yazı)</button>
-      <button class="choice-btn" id="tailsBtn" data-choice="tails">🔵 Tails (Tura)</button>
+      <button class="choice-btn" id="headsBtn" data-choice="heads">🦅 Heads</button>
+      <button class="choice-btn" id="tailsBtn" data-choice="tails">🔵 Tails</button>
     </div>
 
     <button class="btn-success" id="flipBtn">🪙 Flip Coin &amp; Bet</button>
 
     <div class="coin-area">
-      <div class="coin" id="coin">🪙</div>
+      <div class="coin" id="coin">
+        <div class="coin-face front" id="coinFront">🦅</div>
+        <div class="coin-face back" id="coinBack">🔵</div>
+      </div>
     </div>
 
     <div class="result-banner" id="resultBanner"></div>
@@ -201,18 +235,23 @@
       <div class="stat-box"><div class="val red" id="lossesCount">0</div><div class="lbl">Losses</div></div>
     </div>
 
-    <div class="status-bar" id="gameStatus">Bahis miktarını gir, Yazı/Tura seç, parayı çevir!</div>
+    <div class="history-section">
+      <div class="history-title">Last 5 Games</div>
+      <div class="history-list" id="historyList"><span class="history-empty">No games yet</span></div>
+    </div>
+
+    <div class="status-bar" id="gameStatus">Enter a bet amount, pick Heads or Tails, and flip the coin!</div>
   </div>
 
   <!-- HOW IT WORKS -->
   <div class="card">
     <h2>ℹ️ How It Works</h2>
-    <ul style="padding-left:18px; line-height:1.8; font-size:0.88rem; color:#9ca3af">
-      <li>Sphere Wallet extension'ınla bağlan — mevcut hesabın kullanılır.</li>
-      <li>Bahis miktarını gir, Yazı veya Tura seç.</li>
-      <li>Sonuç rastgele belirlenir, bot (@dicebot) ile karşılaşırsın.</li>
-      <li>Kazanırsan, @dicebot bahis miktarını otomatik olarak sana gönderir.</li>
-      <li>Kaybedersen, Sphere extension üzerinden bahis miktarını onaylayıp @dicebot'a gönderirsin.</li>
+    <ul style="padding-left:18px; line-height:1.8; font-size:0.88rem; color:var(--text-dim)">
+      <li>Connect with your Sphere Wallet extension — your existing account is used.</li>
+      <li>Enter a bet amount and pick Heads or Tails.</li>
+      <li>The result is random — you're playing against the bot (@dicebot).</li>
+      <li>If you win, @dicebot automatically sends you the bet amount.</li>
+      <li>If you lose, approve the send to @dicebot in your Sphere extension.</li>
     </ul>
   </div>
 

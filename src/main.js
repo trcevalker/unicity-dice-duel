@@ -38,6 +38,7 @@ const gameStatus = $('gameStatus');
 
 const winsCount   = $('winsCount');
 const lossesCount = $('lossesCount');
+const historyList = $('historyList');
 
 // ── State ───────────────────────────────────────────────────
 let client = null;       // user's ConnectClient (via Sphere Wallet extension/popup)
@@ -47,6 +48,8 @@ let choice = null;       // 'heads' | 'tails'
 let stats = { wins: 0, losses: 0 };
 let uctCoinId = null;     // real hex coinId for UCT, read from sphere_getBalance
 let uctDecimals = null;   // real decimals for UCT, read from sphere_getBalance
+let coinRotation = 0;     // cumulative rotateY degrees, so the coin keeps spinning forward
+let history = [];        // last games, newest first: { win, coinResult, betUct }
 
 // ── Helpers ─────────────────────────────────────────────────
 function setStatus(el, msg, type = '') {
@@ -93,6 +96,56 @@ async function updateBalance() {
   } catch (e) {
     balanceBadge.textContent = '💰 Balance: (refresh to load)';
   }
+}
+
+function renderHistory() {
+  if (history.length === 0) {
+    historyList.innerHTML = '<span class="history-empty">No games yet</span>';
+    return;
+  }
+  historyList.innerHTML = history.slice(0, 5).map(h =>
+    `<span class="history-item ${h.win ? 'win' : 'lose'}">${h.win ? '🏆' : '💸'} ${h.coinResult === 'heads' ? '🦅' : '🔵'} ${h.betUct} UCT</span>`
+  ).join('');
+}
+
+function recordHistory(entry) {
+  history.unshift(entry);
+  history = history.slice(0, 5);
+  renderHistory();
+}
+
+function fireConfetti() {
+  const colors = ['#F97316', '#FF6F00', '#FFB347', '#FFD700', '#FFFFFF'];
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.inset = '0';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '9999';
+  container.style.overflow = 'hidden';
+  document.body.appendChild(container);
+
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    const size = 6 + Math.random() * 6;
+    piece.style.position = 'absolute';
+    piece.style.width = `${size}px`;
+    piece.style.height = `${size * 0.4}px`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.top = '-10px';
+    piece.style.opacity = '0.9';
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+    const duration = 1.8 + Math.random() * 1.2;
+    const drift = (Math.random() - 0.5) * 200;
+    piece.style.transition = `transform ${duration}s cubic-bezier(0.2,0.6,0.4,1), top ${duration}s linear, opacity ${duration}s linear`;
+    container.appendChild(piece);
+    requestAnimationFrame(() => {
+      piece.style.top = '110%';
+      piece.style.transform = `translateX(${drift}px) rotate(${360 + Math.random() * 360}deg)`;
+      piece.style.opacity = '0';
+    });
+  }
+  setTimeout(() => container.remove(), 3200);
 }
 
 function updateBotBalance() {
@@ -196,7 +249,7 @@ flipBtn.addEventListener('click', async () => {
   const betUct = parseFloat(betInput.value);
 
   if (!choice) {
-    setStatus(gameStatus, '❌ Yazı veya Tura seç.', 'error');
+    setStatus(gameStatus, '❌ Pick Heads or Tails.', 'error');
     return;
   }
   if (!betUct || betUct < MIN_BET_UCT || betUct > MAX_BET_UCT) {
@@ -221,15 +274,22 @@ flipBtn.addEventListener('click', async () => {
   spinner(flipBtn, 'Flipping…');
   resultBanner.className = 'result-banner';
   txInfo.classList.add('hidden');
-  coinEl.className = 'coin flipping';
-
-  await new Promise(r => setTimeout(r, 700));
 
   const result = crypto.getRandomValues(new Uint32Array(1))[0] % 2 === 0 ? 'heads' : 'tails';
   const won = result === choice;
 
-  coinEl.className = 'coin';
-  coinEl.textContent = result === 'heads' ? '🦅' : '🔵';
+  // 3D coin flip: spin a few full turns, landing exactly on the face that
+  // matches the result (front = heads, back = tails).
+  const extraSpins = 4 + Math.floor(Math.random() * 2);
+  const targetMod = result === 'tails' ? 180 : 0;
+  const currentMod = ((coinRotation % 360) + 360) % 360;
+  let delta = targetMod - currentMod;
+  if (delta < 0) delta += 360;
+  coinRotation += extraSpins * 360 + delta;
+  coinEl.style.transition = 'transform 1s cubic-bezier(0.2, 0.8, 0.2, 1)';
+  coinEl.style.transform = `rotateY(${coinRotation}deg)`;
+
+  await new Promise(r => setTimeout(r, 1000));
 
   setStatus(gameStatus, `🪙 Landed on ${result}. Processing…`, 'info');
 
@@ -239,6 +299,8 @@ flipBtn.addEventListener('click', async () => {
       resultBanner.className = 'result-banner win';
       stats.wins++;
       winsCount.textContent = stats.wins;
+      recordHistory({ win: true, coinResult: result, betUct });
+      fireConfetti();
 
       setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${betUct} UCT…`, 'info');
 
@@ -267,6 +329,7 @@ flipBtn.addEventListener('click', async () => {
       resultBanner.className = 'result-banner lose';
       stats.losses++;
       lossesCount.textContent = stats.losses;
+      recordHistory({ win: false, coinResult: result, betUct });
 
       if (!client?.isConnected) {
         console.error('Cannot send intent: ConnectClient is not connected', client);
