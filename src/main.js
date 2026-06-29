@@ -98,16 +98,36 @@ async function updateBalance() {
   }
 }
 
-// Resolves UCT's real hex coinId from the bot's own held tokens, instead of
+// Lists every callable method on an object's prototype chain — used to debug
+// what's actually available when an expected method misbehaves.
+function listMethods(obj) {
+  const methods = new Set();
+  let proto = obj;
+  while (proto && proto !== Object.prototype) {
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      if (typeof obj[name] === 'function') methods.add(name);
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return Array.from(methods);
+}
+
+// Resolves a real hex coinId from the bot's own held tokens, instead of
 // guessing the 'UCT' symbol string.
 function resolveBotUctCoinId() {
   if (!botSphere) return null;
   try {
     const tokens = botSphere.payments.getTokens();
-    const uctToken = Array.isArray(tokens) ? tokens.find(t => t.symbol === 'UCT') : null;
-    return uctToken ? uctToken.coinId : null;
+    console.log('[bot] payments.getTokens():', tokens);
+    if (Array.isArray(tokens) && tokens.length > 0) {
+      console.log('[bot] using first token coinId:', tokens[0].coinId, 'symbol:', tokens[0].symbol);
+      return tokens[0].coinId;
+    }
+    console.error('[bot] getTokens() returned no tokens. payments methods available:', listMethods(botSphere.payments));
+    return null;
   } catch (e) {
-    console.error('[bot] getTokens() failed', e);
+    console.error('[bot] getTokens() threw:', e);
+    console.error('[bot] payments methods available:', listMethods(botSphere.payments));
     return null;
   }
 }
@@ -175,6 +195,7 @@ function updateBotBalance() {
     console.error('[bot] getBalance failed:', e);
     botBalanceBadge.textContent = `⚠️ Balance unavailable: ${e.message}`;
   }
+  resolveBotUctCoinId(); // also logs payments.getTokens() output for debugging
 }
 
 // ── Bot wallet (autonomous signer — no human approval needed) ──
