@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎲 Unicity Dice Duel</title>
+  <title>🪙 Unicity Coin Flip</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -54,6 +54,13 @@
       background: linear-gradient(135deg, #f97316, #ea580c);
       color: white; font-size: 1.1rem; padding: 16px;
     }
+    .choice-row { display: flex; gap: 10px; margin-top: 8px; }
+    .choice-btn {
+      flex: 1; margin-top: 0; padding: 14px;
+      background: #1e1e3a; border: 2px solid #3a3a5a; color: #9ca3af;
+      font-size: 1rem;
+    }
+    .choice-btn.selected { border-color: #a78bfa; color: #e0e0ff; background: #2a2350; }
     .status-bar {
       background: #1e1e3a; border: 1px solid #3a3a5a;
       border-radius: 8px; padding: 10px 14px;
@@ -78,21 +85,23 @@
       border: 1px solid #f97316; border-radius: 20px;
       padding: 4px 14px; font-size: 0.9rem; color: #fb923c; margin-top: 10px;
     }
-    .dice-area { display: flex; justify-content: center; gap: 24px; margin: 20px 0; }
-    .dice-container { text-align: center; }
-    .dice-container small { display: block; font-size: 0.75rem; color: #6b7280; margin-bottom: 6px; }
-    .dice {
-      width: 80px; height: 80px; background: #1e1e3a;
-      border: 2px solid #3a3a5a; border-radius: 14px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 3rem; transition: transform 0.3s, border-color 0.3s;
+    .bot-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #1e1e3a; border-radius: 8px; padding: 10px 14px; margin-top: 8px;
+      font-size: 0.85rem; color: #9ca3af;
     }
-    .dice.winner { border-color: #059669; box-shadow: 0 0 16px #05966940; }
-    .dice.loser  { border-color: #dc2626; box-shadow: 0 0 16px #dc262640; }
-    .dice.rolling { animation: shake 0.4s ease-in-out; }
-    @keyframes shake {
-      0%,100%{transform:rotate(0)} 20%{transform:rotate(-12deg)}
-      40%{transform:rotate(12deg)} 60%{transform:rotate(-8deg)} 80%{transform:rotate(8deg)}
+    .coin-area { display: flex; justify-content: center; margin: 24px 0; }
+    .coin {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fde68a, #d97706);
+      border: 3px solid #92400e;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; font-weight: 700; color: #78350f;
+      transition: transform 0.3s;
+    }
+    .coin.flipping { animation: flip 0.6s ease-in-out infinite; }
+    @keyframes flip {
+      0%,100%{transform:rotateY(0)} 50%{transform:rotateY(180deg)}
     }
     .result-banner {
       text-align: center; padding: 14px; border-radius: 12px;
@@ -100,14 +109,13 @@
     }
     .result-banner.win  { background:#05966920; border:1px solid #059669; color:#34d399; display:block; }
     .result-banner.lose { background:#dc262620; border:1px solid #dc2626; color:#f87171; display:block; }
-    .result-banner.tie  { background:#4f46e520; border:1px solid #4f46e5; color:#a5b4fc; display:block; }
     .tx-link { font-size: 0.78rem; color: #6b7280; margin-top: 6px; }
     .tx-link a { color: #a78bfa; text-decoration: none; }
     .stats-row { display: flex; gap: 10px; margin-top: 8px; }
     .stat-box { flex:1; background:#1e1e3a; border-radius:8px; padding:10px; text-align:center; }
     .stat-box .val { font-size:1.4rem; font-weight:700; }
     .stat-box .lbl { font-size:0.7rem; color:#6b7280; margin-top:2px; }
-    .val.green{color:#34d399} .val.red{color:#f87171} .val.blue{color:#60a5fa}
+    .val.green{color:#34d399} .val.red{color:#f87171}
     .section-divider { border:none; border-top:1px solid #2a2a4a; margin:16px 0; }
     .hidden { display: none !important; }
     .spinner {
@@ -128,8 +136,8 @@
 </head>
 <body>
 
-  <h1>🎲 Unicity Dice Duel</h1>
-  <p class="subtitle">Peer-to-peer dice betting on Unicity Testnet · Built with Sphere SDK</p>
+  <h1>🪙 Unicity Coin Flip</h1>
+  <p class="subtitle">Flip a coin against the house bot · Built with Sphere SDK</p>
 
   <!-- CONNECT -->
   <div class="card" id="walletCard">
@@ -146,14 +154,18 @@
 
     <div id="walletInfo" class="hidden">
       <div class="identity-box">
-        <div class="avatar">🎲</div>
+        <div class="avatar">🪙</div>
         <div>
           <div id="identityLabel" style="font-weight:600; font-size:1.1rem"></div>
-          <div style="font-size:0.75rem; color:#6b7280; margin-top:2px">Sphere Wallet · Testnet</div>
+          <div style="font-size:0.75rem; color:#6b7280; margin-top:2px">Sphere Wallet</div>
         </div>
       </div>
       <div id="balanceBadge" class="balance-badge">💰 Loading…</div>
       <button class="btn-primary" id="refreshBalanceBtn" style="background:#1e1e3a; border:1px solid #3a3a5a; color:#a5b4fc; margin-top:10px">↻ Refresh Balance</button>
+      <div class="bot-row">
+        <span>🤖 @dicebot balance</span>
+        <span id="botBalanceBadge">Loading…</span>
+      </div>
     </div>
 
     <div class="status-bar" id="walletStatus">Sphere Wallet extension'ını bağlamak için butona tıkla.</div>
@@ -163,25 +175,20 @@
   <div class="card hidden" id="gameCard">
     <h2>🎮 Play</h2>
 
-    <label>Opponent's Unicity ID</label>
-    <input id="opponentInput" type="text" placeholder="@opponent nametag" />
-
     <label>Bet Amount (UCT base units)</label>
     <input id="betInput" type="number" value="100000" min="1" />
     <small style="color:#6b7280; font-size:0.75rem; margin-top:4px; display:block">100000 base units = 0.1 UCT</small>
 
-    <button class="btn-success" id="rollBtn">🎲 Roll Dice &amp; Bet</button>
+    <label>Your Call</label>
+    <div class="choice-row">
+      <button class="choice-btn" id="headsBtn" data-choice="heads">🦅 Heads (Yazı)</button>
+      <button class="choice-btn" id="tailsBtn" data-choice="tails">🔵 Tails (Tura)</button>
+    </div>
 
-    <div class="dice-area">
-      <div class="dice-container">
-        <small>You</small>
-        <div class="dice" id="myDice">⚀</div>
-      </div>
-      <div style="align-self:center; font-size:1.5rem; color:#6b7280">VS</div>
-      <div class="dice-container">
-        <small>Opponent</small>
-        <div class="dice" id="oppDice">⚀</div>
-      </div>
+    <button class="btn-success" id="flipBtn">🪙 Flip Coin &amp; Bet</button>
+
+    <div class="coin-area">
+      <div class="coin" id="coin">🪙</div>
     </div>
 
     <div class="result-banner" id="resultBanner"></div>
@@ -192,10 +199,9 @@
     <div class="stats-row">
       <div class="stat-box"><div class="val green" id="winsCount">0</div><div class="lbl">Wins</div></div>
       <div class="stat-box"><div class="val red" id="lossesCount">0</div><div class="lbl">Losses</div></div>
-      <div class="stat-box"><div class="val blue" id="tiesCount">0</div><div class="lbl">Ties</div></div>
     </div>
 
-    <div class="status-bar" id="gameStatus">Opponent ID ve bahis miktarını gir, zarları at!</div>
+    <div class="status-bar" id="gameStatus">Bahis miktarını gir, Yazı/Tura seç, parayı çevir!</div>
   </div>
 
   <!-- HOW IT WORKS -->
@@ -203,15 +209,15 @@
     <h2>ℹ️ How It Works</h2>
     <ul style="padding-left:18px; line-height:1.8; font-size:0.88rem; color:#9ca3af">
       <li>Sphere Wallet extension'ınla bağlan — mevcut hesabın kullanılır.</li>
-      <li>Her iki oyuncu 1–6 arası zar atar.</li>
-      <li>Kaybeden, Sphere extension üzerinden bahis miktarını onaylayıp gönderir.</li>
-      <li>Beraberlikte token transferi olmaz.</li>
-      <li>Tüm işlemler Unicity Testnet2 üzerinde gerçekleşir.</li>
+      <li>Bahis miktarını gir, Yazı veya Tura seç.</li>
+      <li>Sonuç rastgele belirlenir, bot (@dicebot) ile karşılaşırsın.</li>
+      <li>Kazanırsan, @dicebot bahis miktarını otomatik olarak sana gönderir.</li>
+      <li>Kaybedersen, Sphere extension üzerinden bahis miktarını onaylayıp @dicebot'a gönderirsin.</li>
     </ul>
   </div>
 
   <footer>
-    Unicity Dice Duel · Sphere SDK + ConnectClient · <a href="https://sphere.unicity.network" target="_blank">sphere.unicity.network</a>
+    Unicity Coin Flip · Sphere SDK + ConnectClient · <a href="https://sphere.unicity.network" target="_blank">sphere.unicity.network</a>
   </footer>
 
   <script type="module" src="/src/main.js"></script>

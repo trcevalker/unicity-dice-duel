@@ -1,6 +1,6 @@
-# 🎲 Unicity Dice Duel
+# 🪙 Unicity Coin Flip
 
-A peer-to-peer dice betting game built on **Unicity** using the **Sphere SDK**. The dApp connects to whichever network your Sphere wallet is already on — it does not target a specific network itself.
+A coin-flip betting game against a house bot, built on **Unicity** using the **Sphere SDK**. The dApp connects to whichever network your Sphere wallet is already on — it currently targets **testnet2**.
 
 > **Track:** Games  
 > **Reward tier target:** Bronze → Silver
@@ -9,13 +9,11 @@ A peer-to-peer dice betting game built on **Unicity** using the **Sphere SDK**. 
 
 ## What It Does
 
-Two players connect their Unicity wallets, choose a bet amount (in UCT base units), and roll dice. The higher roll wins — and the loser's bet is automatically sent to the winner via Sphere SDK's `payments.send()`.
+You connect your Sphere wallet, choose a bet amount (in UCT base units) and call Heads or Tails. The result is decided randomly:
 
-- ✅ Each player gets a **Unicity ID** (nametag like `@alice`)  
-- ✅ Each player holds a **Sphere wallet** with real UCT tokens  
-- ✅ The **loser automatically sends** the bet amount to the winner on-chain  
-- ✅ Ties result in no token transfer  
-- ✅ Win/loss/tie stats tracked per session  
+- ✅ **You win** → the bot (`@dicebot`) automatically sends you the bet amount — no approval needed on its side, it signs autonomously
+- ✅ **You lose** → you approve sending the bet amount to `@dicebot` via your Sphere wallet
+- ✅ Win/loss stats tracked per session
 
 ---
 
@@ -23,11 +21,11 @@ Two players connect their Unicity wallets, choose a bet amount (in UCT base unit
 
 | Layer | Tech |
 |-------|------|
-| SDK | `@unicitylabs/sphere-sdk` v0.10.7 |
+| SDK | `@unicitylabs/sphere-sdk` v0.10.1 |
 | Frontend | Vanilla JS + Vite |
-| Network | Whichever network the connected Sphere wallet is on |
+| Network | testnet2 |
 | Identity | Sphere nametags (`@handle`) |
-| Payments | `sphere.payments.send()` |
+| Payments | `ConnectClient.intent('send', …)` (you) / `sphere.payments.send()` (bot) |
 
 ---
 
@@ -37,10 +35,13 @@ Two players connect their Unicity wallets, choose a bet amount (in UCT base unit
 # 1. Install dependencies
 npm install
 
-# 2. Start dev server
+# 2. Set the bot wallet mnemonic (see "Bot Wallet" below)
+echo "VITE_BOT_MNEMONIC=your twelve words..." > .env
+
+# 3. Start dev server
 npm run dev
 
-# 3. Open http://localhost:5173
+# 4. Open http://localhost:5173
 ```
 
 ## Build for Production
@@ -48,51 +49,46 @@ npm run dev
 ```bash
 npm run build
 # Deploy the dist/ folder to any static host (Vercel, Netlify, GitHub Pages)
+# VITE_BOT_MNEMONIC must be set in the build environment (e.g. a GitHub Actions secret)
 ```
 
 ---
 
 ## How to Play
 
-1. Open the app and create a wallet with a unique nametag (e.g. `dicemaster42`)
-2. **Save your recovery phrase** — it's the only way to restore your wallet
-3. Make sure your wallet holds real UCT tokens via the [Unicity Developer Portal](https://sphere.unicity.network) (you need a Unicity ID first)
-4. Enter your opponent's `@nametag` and a bet amount in UCT base units
-5. Click **Roll Dice & Bet** — dice roll, winner is determined, loser's client sends tokens
+1. Open the app and connect your Sphere wallet (extension, iframe, or popup)
+2. Enter a bet amount in UCT base units
+3. Pick Heads or Tails
+4. Click **Flip Coin & Bet** — if you win, `@dicebot` pays you automatically; if you lose, approve the send in your wallet
 
 ---
 
-## Sphere SDK Usage
+## Bot Wallet
+
+`@dicebot` is a real testnet2 wallet whose mnemonic is loaded directly in the browser via `Sphere.init()` (not through Connect/extension), so it can sign and send `payments.send()` autonomously when it loses — no human approval step exists for the bot.
+
+⚠️ **This means the bot's mnemonic ships inside the public JS bundle.** Anyone can read it from DevTools and drain the bot's wallet. This is acceptable here only because the funds are testnet2 tokens with no real value. Never reuse this pattern with a mainnet-funded wallet.
+
+The bot needs a UCT balance to pay out wins — fund `@dicebot`'s address from another testnet2 wallet if its balance runs low (shown in the app under "🤖 @dicebot balance").
 
 ```js
 import { Sphere } from '@unicitylabs/sphere-sdk';
 import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
 
-// Create / restore wallet — uses whichever network the wallet is already configured for
-const { sphere, generatedMnemonic } = await Sphere.init({
-  ...createBrowserProviders(),
-  autoGenerate: true,
-  nametag: 'dicemaster42',
+const { sphere } = await Sphere.init({
+  ...createBrowserProviders({ network: 'testnet2', oracle: { apiKey: 'sk_...' } }),
+  mnemonic: import.meta.env.VITE_BOT_MNEMONIC,
 });
 
-// Send tokens to the winner
-await sphere.payments.send({
-  recipient: '@opponent',
-  coinId: 'UCT',
-  amount: '100000',  // 0.1 UCT
-});
+await sphere.payments.send({ recipient: '@player', coinId: 'UCT', amount: '100000' });
 ```
 
 ---
 
 ## Agent-Based
 
-This build is **not agent-based** (human-controlled).  
-For an agent extension, see `AGENT_EXTENSION.md`.
-
-## Network
-
-This dApp doesn't target a specific network — it connects via Sphere Connect to whichever network your wallet is already configured for. If that's mainnet, real UCT value is at risk. Bet responsibly.
+This build is **not agent-based** (human-controlled on the player side).  
+The bot side is an autonomous signer, not an AI agent — it always pays out on a loss, deterministically.
 
 ---
 

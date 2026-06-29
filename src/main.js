@@ -1,11 +1,17 @@
 // ============================================================
-// Unicity Dice Duel — main.js
+// Unicity Coin Flip — main.js
 // Built with @unicitylabs/sphere-sdk + Extension Connect
 // Track: Games | Unicity Developer Program
 // ============================================================
 
 import { autoConnect } from '@unicitylabs/sphere-sdk/connect/browser';
-import { NETWORKS } from '@unicitylabs/sphere-sdk';
+import { NETWORKS, Sphere } from '@unicitylabs/sphere-sdk';
+import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
+
+// testnet2 gateway key — published as non-secret by Unicity (sphere-sdk .env.example).
+const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
+const BOT_NAMETAG = 'dicebot';
+const BOT_MNEMONIC = import.meta.env.VITE_BOT_MNEMONIC;
 
 // ── DOM refs ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -14,29 +20,29 @@ const connectBtn     = $('connectBtn');
 const walletInfoDiv  = $('walletInfo');
 const identityLabel  = $('identityLabel');
 const balanceBadge   = $('balanceBadge');
+const botBalanceBadge = $('botBalanceBadge');
 const walletStatus   = $('walletStatus');
 const gameCard       = $('gameCard');
 const refreshBalanceBtn = $('refreshBalanceBtn');
 
-const opponentInput  = $('opponentInput');
-const betInput       = $('betInput');
-const rollBtn        = $('rollBtn');
-const myDice         = $('myDice');
-const oppDice        = $('oppDice');
-const resultBanner   = $('resultBanner');
-const txInfo         = $('txInfo');
-const gameStatus     = $('gameStatus');
+const betInput   = $('betInput');
+const headsBtn   = $('headsBtn');
+const tailsBtn   = $('tailsBtn');
+const flipBtn    = $('flipBtn');
+const coinEl     = $('coin');
+const resultBanner = $('resultBanner');
+const txInfo     = $('txInfo');
+const gameStatus = $('gameStatus');
 
 const winsCount   = $('winsCount');
 const lossesCount = $('lossesCount');
-const tiesCount   = $('tiesCount');
 
 // ── State ───────────────────────────────────────────────────
-let client = null;
+let client = null;       // user's ConnectClient (via Sphere Wallet extension/popup)
 let myNametag = '';
-let stats = { wins: 0, losses: 0, ties: 0 };
-
-const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+let botSphere = null;    // bot's own Sphere instance — signs/sends autonomously
+let choice = null;       // 'heads' | 'tails'
+let stats = { wins: 0, losses: 0 };
 
 // ── Helpers ─────────────────────────────────────────────────
 function setStatus(el, msg, type = '') {
@@ -54,28 +60,55 @@ function resetBtn(btn, text) {
   btn.innerHTML = text;
 }
 
-function rollDice(seed = 0) {
-  const t = Date.now() + seed;
-  return (((t * 1664525 + 1013904223) >>> 0) % 6) + 1;
-}
-
-async function simpleHash(str) {
-  const buf = new TextEncoder().encode(str);
-  const hash = await crypto.subtle.digest('SHA-256', buf);
-  return new Uint32Array(hash)[0];
+function formatUctAssets(assets) {
+  const uct = Array.isArray(assets) ? assets.find(a => a.symbol === 'UCT') : null;
+  return uct ? Number(uct.totalAmount) / 10 ** uct.decimals : 0;
 }
 
 async function updateBalance() {
   if (!client) return;
   try {
     const assets = await client.query('sphere_getBalance');
-    const uct = Array.isArray(assets) ? assets.find(a => a.symbol === 'UCT') : null;
-    const amount = uct ? Number(uct.totalAmount) / 10 ** uct.decimals : 0;
-    balanceBadge.textContent = `💰 ${amount} UCT`;
+    balanceBadge.textContent = `💰 ${formatUctAssets(assets)} UCT`;
   } catch (e) {
     balanceBadge.textContent = '💰 Balance: (refresh to load)';
   }
 }
+
+function updateBotBalance() {
+  if (!botSphere) return;
+  try {
+    const assets = botSphere.payments.getBalance('UCT');
+    botBalanceBadge.textContent = `${formatUctAssets(assets)} UCT`;
+  } catch (e) {
+    botBalanceBadge.textContent = '(unavailable)';
+  }
+}
+
+// ── Bot wallet (autonomous signer — no human approval needed) ──
+async function initBot() {
+  if (!BOT_MNEMONIC) {
+    console.error('VITE_BOT_MNEMONIC is not set — bot cannot pay out winnings.');
+    botBalanceBadge.textContent = '(bot not configured)';
+    return;
+  }
+  try {
+    const providers = createBrowserProviders({
+      network: 'testnet2',
+      oracle: { apiKey: TESTNET2_API_KEY },
+    });
+    const { sphere } = await Sphere.init({
+      ...providers,
+      mnemonic: BOT_MNEMONIC,
+    });
+    botSphere = sphere;
+    updateBotBalance();
+  } catch (e) {
+    console.error('Bot wallet init failed', e);
+    botBalanceBadge.textContent = '(unavailable)';
+  }
+}
+initBot();
 
 // ── Connect to Sphere Wallet ──────────────────────────────────
 // autoConnect() picks the best transport itself: extension if installed,
@@ -87,8 +120,8 @@ connectBtn.addEventListener('click', async () => {
   try {
     const { client: connectedClient, connection } = await autoConnect({
       dapp: {
-        name: 'Unicity Dice Duel',
-        description: 'P2P dice betting game on Unicity',
+        name: 'Unicity Coin Flip',
+        description: 'Coin flip betting game against a bot, on Unicity',
         url: location.origin,
       },
       walletUrl: 'https://sphere.unicity.network',
@@ -106,6 +139,7 @@ connectBtn.addEventListener('click', async () => {
     identityLabel.textContent = `@${myNametag}`;
     setStatus(walletStatus, `✅ Connected as @${myNametag}`, 'success');
     await updateBalance();
+    updateBotBalance();
 
   } catch (err) {
     resetBtn(connectBtn, '🔌 Connect Sphere Wallet');
@@ -120,17 +154,28 @@ connectBtn.addEventListener('click', async () => {
   }
 });
 
-refreshBalanceBtn?.addEventListener('click', updateBalance);
+refreshBalanceBtn?.addEventListener('click', () => {
+  updateBalance();
+  updateBotBalance();
+});
+
+// ── Choice selection ────────────────────────────────────────
+function selectChoice(value) {
+  choice = value;
+  headsBtn.classList.toggle('selected', value === 'heads');
+  tailsBtn.classList.toggle('selected', value === 'tails');
+}
+headsBtn.addEventListener('click', () => selectChoice('heads'));
+tailsBtn.addEventListener('click', () => selectChoice('tails'));
 
 // ── Game logic ───────────────────────────────────────────────
-rollBtn.addEventListener('click', async () => {
+flipBtn.addEventListener('click', async () => {
   if (!client) return;
 
-  const opponent = opponentInput.value.trim().replace(/^@/, '');
   const bet = parseInt(betInput.value, 10);
 
-  if (!opponent) {
-    setStatus(gameStatus, '❌ Enter opponent\'s Unicity ID.', 'error');
+  if (!choice) {
+    setStatus(gameStatus, '❌ Yazı veya Tura seç.', 'error');
     return;
   }
   if (!bet || bet < 1) {
@@ -138,86 +183,84 @@ rollBtn.addEventListener('click', async () => {
     return;
   }
 
-  spinner(rollBtn, 'Rolling dice…');
+  spinner(flipBtn, 'Flipping…');
   resultBanner.className = 'result-banner';
   txInfo.classList.add('hidden');
+  coinEl.className = 'coin flipping';
 
-  myDice.className = 'dice rolling';
-  oppDice.className = 'dice rolling';
+  await new Promise(r => setTimeout(r, 700));
 
-  const animInterval = setInterval(() => {
-    myDice.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
-    oppDice.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
-  }, 80);
+  const result = crypto.getRandomValues(new Uint32Array(1))[0] % 2 === 0 ? 'heads' : 'tails';
+  const won = result === choice;
 
-  await new Promise(r => setTimeout(r, 500));
-  clearInterval(animInterval);
+  coinEl.className = 'coin';
+  coinEl.textContent = result === 'heads' ? '🦅' : '🔵';
 
-  const myRollNum = rollDice(0);
-  const oppSeed = await simpleHash(opponent + Date.now().toString().slice(0, -3));
-  const oppRollNum = rollDice(oppSeed);
-
-  myDice.textContent = DICE_FACES[myRollNum - 1];
-  oppDice.textContent = DICE_FACES[oppRollNum - 1];
-  myDice.className = 'dice';
-  oppDice.className = 'dice';
-
-  setStatus(gameStatus, `🎲 You rolled ${myRollNum}, @${opponent} rolled ${oppRollNum}. Processing…`, 'info');
+  setStatus(gameStatus, `🪙 Landed on ${result}. Processing…`, 'info');
 
   try {
-    if (myRollNum > oppRollNum) {
-      myDice.className = 'dice winner';
-      oppDice.className = 'dice loser';
-      resultBanner.textContent = `🏆 You WIN! Rolled ${myRollNum} vs ${oppRollNum}`;
+    if (won) {
+      resultBanner.textContent = `🏆 You WIN! It landed on ${result}.`;
       resultBanner.className = 'result-banner win';
       stats.wins++;
       winsCount.textContent = stats.wins;
-      setStatus(gameStatus, `✅ You win! @${opponent} owes you ${bet} UCT base units.`, 'success');
 
-    } else if (myRollNum < oppRollNum) {
-      myDice.className = 'dice loser';
-      oppDice.className = 'dice winner';
-      resultBanner.textContent = `💸 You LOSE! Rolled ${myRollNum} vs ${oppRollNum}`;
-      resultBanner.className = 'result-banner lose';
-      stats.losses++;
-      lossesCount.textContent = stats.losses;
-
-      setStatus(gameStatus, `⏳ Sending ${bet} UCT base units to @${opponent}…`, 'info');
+      setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${bet} UCT base units…`, 'info');
 
       try {
-        // Use extension intent — pops up approval in Sphere extension
-        const tx = await client.intent('send', {
-          recipient: `@${opponent}`,
-          amount: bet,
+        if (!botSphere) throw new Error('Bot wallet is not ready');
+        const tx = await botSphere.payments.send({
+          recipient: `@${myNametag}`,
           coinId: 'UCT',
+          amount: String(bet),
         });
 
-        setStatus(gameStatus, `✅ Sent ${bet} UCT base units to @${opponent}!`, 'success');
+        setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${bet} UCT base units!`, 'success');
         if (tx?.id) {
           txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
           txInfo.classList.remove('hidden');
         }
         await updateBalance();
+        updateBotBalance();
+      } catch (payErr) {
+        setStatus(gameStatus, `⚠️ You won, but the bot's payout failed: ${payErr.message}`, 'error');
+      }
+
+    } else {
+      resultBanner.textContent = `💸 You LOSE! It landed on ${result}.`;
+      resultBanner.className = 'result-banner lose';
+      stats.losses++;
+      lossesCount.textContent = stats.losses;
+
+      setStatus(gameStatus, `⏳ Sending ${bet} UCT base units to @${BOT_NAMETAG}…`, 'info');
+
+      try {
+        // Use extension intent — pops up approval in Sphere extension
+        const tx = await client.intent('send', {
+          recipient: `@${BOT_NAMETAG}`,
+          amount: bet,
+          coinId: 'UCT',
+        });
+
+        setStatus(gameStatus, `✅ Sent ${bet} UCT base units to @${BOT_NAMETAG}!`, 'success');
+        if (tx?.id) {
+          txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
+          txInfo.classList.remove('hidden');
+        }
+        await updateBalance();
+        updateBotBalance();
 
       } catch (payErr) {
-        // User may have rejected in extension
         if (payErr.message?.includes('rejected') || payErr.message?.includes('denied')) {
           setStatus(gameStatus, `⚠️ Payment rejected in Sphere extension. You lost but didn't pay!`, 'error');
         } else {
           setStatus(gameStatus, `⚠️ Payment failed: ${payErr.message}`, 'error');
         }
       }
-
-    } else {
-      resultBanner.textContent = `🤝 TIE! Both rolled ${myRollNum} — no tokens transferred.`;
-      resultBanner.className = 'result-banner tie';
-      stats.ties++;
-      tiesCount.textContent = stats.ties;
-      setStatus(gameStatus, `🤝 Tie game! No tokens moved.`, 'info');
     }
   } catch (err) {
     setStatus(gameStatus, `❌ Error: ${err.message}`, 'error');
   }
 
-  resetBtn(rollBtn, '🎲 Roll Dice & Bet');
+  resetBtn(flipBtn, '🪙 Flip Coin & Bet');
 });
