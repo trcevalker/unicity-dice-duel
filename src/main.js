@@ -84,7 +84,9 @@ function cacheUctInfo(assets) {
 
 function formatUctAssets(assets) {
   const uct = findUctAsset(assets);
-  return uct ? Number(uct.totalAmount) / 10 ** uct.decimals : 0;
+  if (!uct) return '0';
+  const value = Number(uct.totalAmount) / 10 ** uct.decimals;
+  return Number(value.toFixed(4)).toString();
 }
 
 async function updateBalance() {
