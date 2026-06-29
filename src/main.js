@@ -4,8 +4,7 @@
 // Track: Games | Unicity Developer Program
 // ============================================================
 
-import { ConnectClient } from '@unicitylabs/sphere-sdk/connect';
-import { ExtensionTransport } from '@unicitylabs/sphere-sdk/connect/browser';
+import { autoConnect } from '@unicitylabs/sphere-sdk/connect/browser';
 
 // ── DOM refs ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -79,37 +78,25 @@ async function updateBalance() {
   }
 }
 
-// ── Connect to Sphere Extension ──────────────────────────────
-function hasSphereExtension() {
-  const sphere = window.sphere;
-  return !!sphere && typeof sphere === 'object' &&
-    typeof sphere.isInstalled === 'function' && sphere.isInstalled() === true;
-}
-
+// ── Connect to Sphere Wallet ──────────────────────────────────
+// autoConnect() picks the best transport itself: extension if installed,
+// iframe if embedded, otherwise a wallet popup at walletUrl.
 connectBtn.addEventListener('click', async () => {
-  if (!hasSphereExtension()) {
-    setStatus(walletStatus,
-      '❌ Sphere extension not found. Install it from github.com/unicity-sphere/sphere-extension',
-      'error'
-    );
-    return;
-  }
-
   spinner(connectBtn, 'Connecting to Sphere…');
-  setStatus(walletStatus, '⏳ Waiting for Sphere extension approval…', 'info');
+  setStatus(walletStatus, '⏳ Waiting for Sphere wallet approval…', 'info');
 
   try {
-    client = new ConnectClient({
-      transport: ExtensionTransport.forClient(),
+    const { client: connectedClient, connection } = await autoConnect({
       dapp: {
         name: 'Unicity Dice Duel',
         description: 'P2P dice betting game on Unicity Testnet',
         url: location.origin,
       },
+      walletUrl: 'https://sphere.unicity.network',
     });
 
-    const { identity } = await client.connect();
-    myNametag = identity?.nametag || identity?.name || 'unknown';
+    client = connectedClient;
+    myNametag = connection.identity?.nametag || connection.identity?.name || 'unknown';
 
     // Show wallet info
     connectBtn.classList.add('hidden');
@@ -122,9 +109,9 @@ connectBtn.addEventListener('click', async () => {
 
   } catch (err) {
     resetBtn(connectBtn, '🔌 Connect Sphere Wallet');
-    if (err.message?.includes('not found') || err.message?.includes('transport')) {
+    if (err.message?.includes('popup')) {
       setStatus(walletStatus,
-        '❌ Sphere extension not found. Install it from github.com/unicity-sphere/sphere-extension',
+        '❌ Could not open the Sphere wallet popup. Check your popup blocker, or install the extension from github.com/unicity-sphere/sphere-extension',
         'error'
       );
     } else {
