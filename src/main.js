@@ -10,7 +10,7 @@ import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
 
 // testnet2 gateway key — published as non-secret by Unicity (sphere-sdk .env.example).
 const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
-const BOT_NAMETAG = 'dicebot';
+const BOT_NAMETAG = 'dicebot2';
 const BOT_MNEMONIC = import.meta.env.VITE_BOT_MNEMONIC;
 const MIN_BET_UCT = 0.1;
 const MAX_BET_UCT = 10;
@@ -183,6 +183,7 @@ async function initBot() {
     });
     botSphere = sphere;
     console.log('[bot] Sphere.init() succeeded. created:', created, 'nametag:', sphere.identity?.nametag, 'identity:', sphere.identity);
+    console.log(`[bot] nametag: @${sphere.identity?.nametag}  address: ${sphere.identity?.directAddress}`);
     if (sphere.identity?.nametag !== BOT_NAMETAG) {
       console.error(`[bot] WARNING: wallet's nametag "${sphere.identity?.nametag}" does not match expected "${BOT_NAMETAG}"`);
     }

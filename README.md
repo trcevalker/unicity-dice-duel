@@ -11,8 +11,8 @@ A coin-flip betting game against a house bot, built on **Unicity** using the **S
 
 You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Heads or Tails. The result is decided randomly:
 
-- ✅ **You win** → the bot (`@dicebot`) automatically sends you the bet amount — no approval needed on its side, it signs autonomously
-- ✅ **You lose** → you approve sending the bet amount to `@dicebot` via your Sphere wallet
+- ✅ **You win** → the bot (`@dicebot2`) automatically sends you the bet amount — no approval needed on its side, it signs autonomously
+- ✅ **You lose** → you approve sending the bet amount to `@dicebot2` via your Sphere wallet
 - ✅ Win/loss stats tracked per session
 
 ---
@@ -59,17 +59,17 @@ npm run build
 1. Open the app and connect your Sphere wallet (extension, iframe, or popup)
 2. Enter a bet amount in UCT base units
 3. Pick Heads or Tails
-4. Click **Flip Coin & Bet** — if you win, `@dicebot` pays you automatically; if you lose, approve the send in your wallet
+4. Click **Flip Coin & Bet** — if you win, `@dicebot2` pays you automatically; if you lose, approve the send in your wallet
 
 ---
 
 ## Bot Wallet
 
-`@dicebot` is a real testnet2 wallet whose mnemonic is loaded directly in the browser via `Sphere.init()` (not through Connect/extension), so it can sign and send `payments.send()` autonomously when it loses — no human approval step exists for the bot.
+`@dicebot2` is a real testnet2 wallet whose mnemonic is loaded directly in the browser via `Sphere.init()` (not through Connect/extension), so it can sign and send `payments.send()` autonomously when it loses — no human approval step exists for the bot.
 
 ⚠️ **This means the bot's mnemonic ships inside the public JS bundle.** Anyone can read it from DevTools and drain the bot's wallet. This is acceptable here only because the funds are testnet2 tokens with no real value. Never reuse this pattern with a mainnet-funded wallet.
 
-The bot needs a UCT balance to pay out wins — fund `@dicebot`'s address from another testnet2 wallet if its balance runs low (shown in the app under "🤖 @dicebot balance").
+The bot needs a UCT balance to pay out wins — fund `@dicebot2`'s address from another testnet2 wallet if its balance runs low (shown in the app under "🤖 @dicebot2 balance").
 
 ```js
 import { Sphere } from '@unicitylabs/sphere-sdk';
