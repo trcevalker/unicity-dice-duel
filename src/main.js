@@ -12,6 +12,9 @@ import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
 const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
 const BOT_NAMETAG = 'dicebot';
 const BOT_MNEMONIC = import.meta.env.VITE_BOT_MNEMONIC;
+const UCT_DECIMALS = 6; // 1 UCT = 1_000_000 base units
+const MIN_BET_UCT = 0.1;
+const MAX_BET_UCT = 10;
 
 // ── DOM refs ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -99,6 +102,7 @@ async function initBot() {
     });
     const { sphere } = await Sphere.init({
       ...providers,
+      network: 'testnet2',
       mnemonic: BOT_MNEMONIC,
     });
     botSphere = sphere;
@@ -172,16 +176,17 @@ tailsBtn.addEventListener('click', () => selectChoice('tails'));
 flipBtn.addEventListener('click', async () => {
   if (!client) return;
 
-  const bet = parseInt(betInput.value, 10);
+  const betUct = parseFloat(betInput.value);
 
   if (!choice) {
     setStatus(gameStatus, '❌ Yazı veya Tura seç.', 'error');
     return;
   }
-  if (!bet || bet < 1) {
-    setStatus(gameStatus, '❌ Enter a valid bet amount.', 'error');
+  if (!betUct || betUct < MIN_BET_UCT || betUct > MAX_BET_UCT) {
+    setStatus(gameStatus, `❌ Enter a bet between ${MIN_BET_UCT} and ${MAX_BET_UCT} UCT.`, 'error');
     return;
   }
+  const bet = Math.round(betUct * 10 ** UCT_DECIMALS);
 
   spinner(flipBtn, 'Flipping…');
   resultBanner.className = 'result-banner';
@@ -205,7 +210,7 @@ flipBtn.addEventListener('click', async () => {
       stats.wins++;
       winsCount.textContent = stats.wins;
 
-      setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${bet} UCT base units…`, 'info');
+      setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${betUct} UCT…`, 'info');
 
       try {
         if (!botSphere) throw new Error('Bot wallet is not ready');
@@ -215,7 +220,7 @@ flipBtn.addEventListener('click', async () => {
           amount: String(bet),
         });
 
-        setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${bet} UCT base units!`, 'success');
+        setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${betUct} UCT!`, 'success');
         if (tx?.id) {
           txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
           txInfo.classList.remove('hidden');
@@ -232,7 +237,7 @@ flipBtn.addEventListener('click', async () => {
       stats.losses++;
       lossesCount.textContent = stats.losses;
 
-      setStatus(gameStatus, `⏳ Sending ${bet} UCT base units to @${BOT_NAMETAG}…`, 'info');
+      setStatus(gameStatus, `⏳ Sending ${betUct} UCT to @${BOT_NAMETAG}…`, 'info');
 
       try {
         // Use extension intent — pops up approval in Sphere extension
@@ -242,7 +247,7 @@ flipBtn.addEventListener('click', async () => {
           coinId: 'UCT',
         });
 
-        setStatus(gameStatus, `✅ Sent ${bet} UCT base units to @${BOT_NAMETAG}!`, 'success');
+        setStatus(gameStatus, `✅ Sent ${betUct} UCT to @${BOT_NAMETAG}!`, 'success');
         if (tx?.id) {
           txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
           txInfo.classList.remove('hidden');

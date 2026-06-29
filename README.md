@@ -9,7 +9,7 @@ A coin-flip betting game against a house bot, built on **Unicity** using the **S
 
 ## What It Does
 
-You connect your Sphere wallet, choose a bet amount (in UCT base units) and call Heads or Tails. The result is decided randomly:
+You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Heads or Tails. The result is decided randomly:
 
 - ✅ **You win** → the bot (`@dicebot`) automatically sends you the bet amount — no approval needed on its side, it signs autonomously
 - ✅ **You lose** → you approve sending the bet amount to `@dicebot` via your Sphere wallet
