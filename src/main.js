@@ -114,24 +114,39 @@ function listMethods(obj) {
   return Array.from(methods);
 }
 
-// Resolves a real hex coinId from the bot's own held tokens, instead of
-// guessing the 'UCT' symbol string.
-function resolveBotUctCoinId() {
-  if (!botSphere) return null;
+// Resolves a real hex coinId from the bot's own assets/tokens.
+// Priority: getAssets() → getTokens() → cached uctCoinId from user's wallet.
+async function resolveBotUctCoinId() {
+  if (!botSphere) return uctCoinId || null;
+
+  // 1. Try getAssets() — aggregated balance view (async)
+  try {
+    const assets = await botSphere.payments.getAssets?.();
+    console.log('[bot] payments.getAssets():', assets);
+    if (Array.isArray(assets) && assets.length > 0) {
+      const uct = assets.find(a => a.symbol === 'UCT') ?? assets[0];
+      console.log('[bot] coinId from getAssets():', uct.coinId, 'symbol:', uct.symbol);
+      return uct.coinId;
+    }
+  } catch (e) {
+    console.error('[bot] getAssets() failed:', e.message);
+  }
+
+  // 2. Try getTokens() — individual token UTXOs (sync)
   try {
     const tokens = botSphere.payments.getTokens();
     console.log('[bot] payments.getTokens():', tokens);
     if (Array.isArray(tokens) && tokens.length > 0) {
-      console.log('[bot] using first token coinId:', tokens[0].coinId, 'symbol:', tokens[0].symbol);
+      console.log('[bot] coinId from getTokens():', tokens[0].coinId, 'symbol:', tokens[0].symbol);
       return tokens[0].coinId;
     }
-    console.error('[bot] getTokens() returned no tokens. payments methods available:', listMethods(botSphere.payments));
-    return null;
   } catch (e) {
-    console.error('[bot] getTokens() threw:', e);
-    console.error('[bot] payments methods available:', listMethods(botSphere.payments));
-    return null;
+    console.error('[bot] getTokens() failed:', e.message);
   }
+
+  // 3. Fall back to the coinId resolved from the user's own wallet (same coin)
+  console.warn('[bot] getAssets() and getTokens() both empty — using user wallet coinId:', uctCoinId);
+  return uctCoinId || null;
 }
 
 function renderHistory() {
@@ -187,17 +202,17 @@ function fireConfetti() {
 // The bot has no ConnectClient, so there's no RPC layer to call the
 // `sphere_getBalance` wire method through — payments.getBalance() is the
 // same underlying call that method wraps on the wallet side.
-function updateBotBalance() {
+async function updateBotBalance() {
   if (!botSphere) return;
   try {
-    const assets = botSphere.payments.getBalance('UCT');
+    const assets = await botSphere.payments.getAssets?.() ?? botSphere.payments.getBalance('UCT');
+    console.log('[bot] payments.getAssets():', assets);
     botBalanceBadge.textContent = `${formatUctAssets(assets)} UCT`;
-    console.log('[bot] balance:', assets);
   } catch (e) {
-    console.error('[bot] getBalance failed:', e);
+    console.error('[bot] getAssets/getBalance failed:', e);
     botBalanceBadge.textContent = `⚠️ Balance unavailable: ${e.message}`;
   }
-  resolveBotUctCoinId(); // also logs payments.getTokens() output for debugging
+  await resolveBotUctCoinId();
 }
 
 // ── Bot wallet (autonomous signer — no human approval needed) ──
@@ -365,7 +380,7 @@ flipBtn.addEventListener('click', async () => {
         if (!botSphere) throw new Error('Bot wallet is not ready');
         // Prefer the coinId from the bot's own held tokens; fall back to the
         // coinId already resolved from the user's balance (same coin either way).
-        const botCoinId = resolveBotUctCoinId() || uctCoinId;
+        const botCoinId = await resolveBotUctCoinId() || uctCoinId;
         if (!botCoinId) throw new Error('Could not resolve UCT coinId from bot tokens');
         console.log('[bot] payments.send() with coinId:', botCoinId, 'amount:', bet, 'recipient:', myNametag);
         const tx = await botSphere.payments.send({
