@@ -98,6 +98,20 @@ async function updateBalance() {
   }
 }
 
+// Resolves UCT's real hex coinId from the bot's own held tokens, instead of
+// guessing the 'UCT' symbol string.
+function resolveBotUctCoinId() {
+  if (!botSphere) return null;
+  try {
+    const tokens = botSphere.payments.getTokens();
+    const uctToken = Array.isArray(tokens) ? tokens.find(t => t.symbol === 'UCT') : null;
+    return uctToken ? uctToken.coinId : null;
+  } catch (e) {
+    console.error('[bot] getTokens() failed', e);
+    return null;
+  }
+}
+
 function renderHistory() {
   if (history.length === 0) {
     historyList.innerHTML = '<span class="history-empty">No games yet</span>';
@@ -317,9 +331,14 @@ flipBtn.addEventListener('click', async () => {
 
       try {
         if (!botSphere) throw new Error('Bot wallet is not ready');
+        // Prefer the coinId from the bot's own held tokens; fall back to the
+        // coinId already resolved from the user's balance (same coin either way).
+        const botCoinId = resolveBotUctCoinId() || uctCoinId;
+        if (!botCoinId) throw new Error('Could not resolve UCT coinId from bot tokens');
+        console.log('[bot] payments.send() with coinId:', botCoinId, 'amount:', bet, 'recipient:', myNametag);
         const tx = await botSphere.payments.send({
           recipient: `@${myNametag}`,
-          coinId: 'UCT',
+          coinId: botCoinId,
           amount: String(bet),
         });
 
