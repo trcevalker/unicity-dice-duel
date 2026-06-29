@@ -12,7 +12,6 @@ import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
 const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
 const BOT_NAMETAG = 'dicebot';
 const BOT_MNEMONIC = import.meta.env.VITE_BOT_MNEMONIC;
-const UCT_DECIMALS = 6; // 1 UCT = 1_000_000 base units
 const MIN_BET_UCT = 0.1;
 const MAX_BET_UCT = 10;
 
@@ -47,6 +46,7 @@ let botSphere = null;    // bot's own Sphere instance — signs/sends autonomous
 let choice = null;       // 'heads' | 'tails'
 let stats = { wins: 0, losses: 0 };
 let uctCoinId = null;     // real hex coinId for UCT, read from sphere_getBalance
+let uctDecimals = null;   // real decimals for UCT, read from sphere_getBalance
 
 // ── Helpers ─────────────────────────────────────────────────
 function setStatus(el, msg, type = '') {
@@ -68,6 +68,17 @@ function findUctAsset(assets) {
   return Array.isArray(assets) ? assets.find(a => a.symbol === 'UCT') : null;
 }
 
+// Caches the real coinId/decimals as a side effect so later sends use the
+// wallet's own values instead of a guessed constant.
+function cacheUctInfo(assets) {
+  const uct = findUctAsset(assets);
+  if (uct) {
+    uctCoinId = uct.coinId;
+    uctDecimals = uct.decimals;
+  }
+  return uct;
+}
+
 function formatUctAssets(assets) {
   const uct = findUctAsset(assets);
   return uct ? Number(uct.totalAmount) / 10 ** uct.decimals : 0;
@@ -77,8 +88,7 @@ async function updateBalance() {
   if (!client) return;
   try {
     const assets = await client.query('sphere_getBalance');
-    const uct = findUctAsset(assets);
-    if (uct) uctCoinId = uct.coinId;
+    cacheUctInfo(assets);
     balanceBadge.textContent = `💰 ${formatUctAssets(assets)} UCT`;
   } catch (e) {
     balanceBadge.textContent = '💰 Balance: (refresh to load)';
@@ -193,7 +203,20 @@ flipBtn.addEventListener('click', async () => {
     setStatus(gameStatus, `❌ Enter a bet between ${MIN_BET_UCT} and ${MAX_BET_UCT} UCT.`, 'error');
     return;
   }
-  const bet = Math.round(betUct * 10 ** UCT_DECIMALS);
+
+  if (uctDecimals === null) {
+    // Not cached yet — read the real decimals from sphere_getBalance.
+    try {
+      cacheUctInfo(await client.query('sphere_getBalance'));
+    } catch (e) {
+      console.error('Failed to resolve UCT decimals from sphere_getBalance', e);
+    }
+  }
+  if (uctDecimals === null || !uctCoinId) {
+    setStatus(gameStatus, '❌ Could not resolve UCT token info from your wallet balance.', 'error');
+    return;
+  }
+  const bet = Math.round(betUct * 10 ** uctDecimals);
 
   spinner(flipBtn, 'Flipping…');
   resultBanner.className = 'result-banner';
@@ -253,22 +276,6 @@ flipBtn.addEventListener('click', async () => {
       }
 
       setStatus(gameStatus, `⏳ Sending ${betUct} UCT to @${BOT_NAMETAG}…`, 'info');
-
-      if (!uctCoinId) {
-        // Not cached yet — read it from sphere_getBalance before sending.
-        try {
-          const assets = await client.query('sphere_getBalance');
-          const uct = findUctAsset(assets);
-          if (uct) uctCoinId = uct.coinId;
-        } catch (e) {
-          console.error('Failed to resolve UCT coinId from sphere_getBalance', e);
-        }
-      }
-      if (!uctCoinId) {
-        setStatus(gameStatus, '❌ Could not resolve UCT coinId from your wallet balance.', 'error');
-        resetBtn(flipBtn, '🪙 Flip Coin & Bet');
-        return;
-      }
 
       try {
         // Use extension intent — pops up approval in Sphere extension.
