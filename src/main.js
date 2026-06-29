@@ -377,25 +377,25 @@ flipBtn.addEventListener('click', async () => {
       setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${betUct} UCT…`, 'info');
 
       try {
-        if (!botSphere) throw new Error('Bot wallet is not ready');
-        // Prefer the coinId from the bot's own held tokens; fall back to the
-        // coinId already resolved from the user's balance (same coin either way).
-        const botCoinId = await resolveBotUctCoinId() || uctCoinId;
-        if (!botCoinId) throw new Error('Could not resolve UCT coinId from bot tokens');
-        console.log('[bot] payments.send() with coinId:', botCoinId, 'amount:', bet, 'recipient:', myNametag);
-        const tx = await botSphere.payments.send({
-          recipient: `@${myNametag}`,
-          coinId: botCoinId,
-          amount: String(bet),
+        if (!uctCoinId) throw new Error('Could not resolve UCT coinId — connect wallet first');
+        console.log('[payout] calling /api/payout recipient:', myNametag, 'amount:', bet, 'coinId:', uctCoinId);
+        const res = await fetch('/api/payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipient: `@${myNametag}`, amount: String(bet), coinId: uctCoinId }),
         });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Payout API error ${res.status}`);
 
         setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${betUct} UCT!`, 'success');
-        if (tx?.id) {
-          txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
+        if (data.tx?.id) {
+          txInfo.innerHTML = `📝 TX: ${data.tx.id}`;
           txInfo.classList.remove('hidden');
         }
+        if (data.botBalance !== undefined) {
+          botBalanceBadge.textContent = `${Number(data.botBalance) / 10 ** (uctDecimals ?? 18)} UCT`;
+        }
         await updateBalance();
-        updateBotBalance();
       } catch (payErr) {
         console.error('Bot payout failed', payErr);
         setStatus(gameStatus, `⚠️ You won, but the bot's payout failed: ${payErr.message}`, 'error');

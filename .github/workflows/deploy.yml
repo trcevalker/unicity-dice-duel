@@ -26,6 +26,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BOT_MNEMONIC: ${{ secrets.VITE_BOT_MNEMONIC }}
+          VITE_BASE_URL: /unicity-dice-duel/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

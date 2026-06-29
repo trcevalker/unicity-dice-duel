@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: '/unicity-dice-duel/',
+  base: process.env.VITE_BASE_URL || '/',
   optimizeDeps: {
     include: ['@unicitylabs/sphere-sdk']
   },
