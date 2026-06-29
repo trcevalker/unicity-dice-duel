@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@unicitylabs/sphere-sdk": "^0.10.7"
+    "@unicitylabs/sphere-sdk": "^0.10.1"
   },
   "devDependencies": {
     "vite": "^5.0.0"

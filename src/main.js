@@ -5,6 +5,7 @@
 // ============================================================
 
 import { autoConnect } from '@unicitylabs/sphere-sdk/connect/browser';
+import { NETWORKS } from '@unicitylabs/sphere-sdk';
 
 // ── DOM refs ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -93,6 +94,7 @@ connectBtn.addEventListener('click', async () => {
         url: location.origin,
       },
       walletUrl: 'https://sphere.unicity.network',
+      network: { id: NETWORKS.testnet2.networkId, name: NETWORKS.testnet2.name },
     });
 
     client = connectedClient;
