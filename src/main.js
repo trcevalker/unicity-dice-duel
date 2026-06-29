@@ -89,7 +89,7 @@ connectBtn.addEventListener('click', async () => {
     const { client: connectedClient, connection } = await autoConnect({
       dapp: {
         name: 'Unicity Dice Duel',
-        description: 'P2P dice betting game on Unicity Testnet',
+        description: 'P2P dice betting game on Unicity Mainnet',
         url: location.origin,
       },
       walletUrl: 'https://sphere.unicity.network',
@@ -194,7 +194,7 @@ rollBtn.addEventListener('click', async () => {
 
         setStatus(gameStatus, `✅ Sent ${bet} UCT base units to @${opponent}!`, 'success');
         if (tx?.id) {
-          txInfo.innerHTML = `📝 TX: <a href="https://testnet2.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
+          txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
           txInfo.classList.remove('hidden');
         }
         await updateBalance();
