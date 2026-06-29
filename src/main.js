@@ -228,6 +228,7 @@ flipBtn.addEventListener('click', async () => {
         await updateBalance();
         updateBotBalance();
       } catch (payErr) {
+        console.error('Bot payout failed', payErr);
         setStatus(gameStatus, `⚠️ You won, but the bot's payout failed: ${payErr.message}`, 'error');
       }
 
@@ -236,6 +237,13 @@ flipBtn.addEventListener('click', async () => {
       resultBanner.className = 'result-banner lose';
       stats.losses++;
       lossesCount.textContent = stats.losses;
+
+      if (!client?.isConnected) {
+        console.error('Cannot send intent: ConnectClient is not connected', client);
+        setStatus(gameStatus, '❌ Wallet is not connected — reconnect and try again.', 'error');
+        resetBtn(flipBtn, '🪙 Flip Coin & Bet');
+        return;
+      }
 
       setStatus(gameStatus, `⏳ Sending ${betUct} UCT to @${BOT_NAMETAG}…`, 'info');
 
@@ -256,6 +264,7 @@ flipBtn.addEventListener('click', async () => {
         updateBotBalance();
 
       } catch (payErr) {
+        console.error('client.intent("send") failed', payErr);
         if (payErr.message?.includes('rejected') || payErr.message?.includes('denied')) {
           setStatus(gameStatus, `⚠️ Payment rejected in Sphere extension. You lost but didn't pay!`, 'error');
         } else {
