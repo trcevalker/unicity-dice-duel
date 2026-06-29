@@ -248,10 +248,11 @@ flipBtn.addEventListener('click', async () => {
       setStatus(gameStatus, `⏳ Sending ${betUct} UCT to @${BOT_NAMETAG}…`, 'info');
 
       try {
-        // Use extension intent — pops up approval in Sphere extension
+        // Use extension intent — pops up approval in Sphere extension.
+        // Wire param is `to`, not `recipient` (Sphere Connect protocol).
         const tx = await client.intent('send', {
-          recipient: `@${BOT_NAMETAG}`,
-          amount: bet,
+          to: `@${BOT_NAMETAG}`,
+          amount: String(bet),
           coinId: 'UCT',
         });
 
