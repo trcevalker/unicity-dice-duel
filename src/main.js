@@ -89,7 +89,7 @@ connectBtn.addEventListener('click', async () => {
     const { client: connectedClient, connection } = await autoConnect({
       dapp: {
         name: 'Unicity Dice Duel',
-        description: 'P2P dice betting game on Unicity Mainnet',
+        description: 'P2P dice betting game on Unicity',
         url: location.origin,
       },
       walletUrl: 'https://sphere.unicity.network',
