@@ -4,7 +4,7 @@
   "framework": "vite",
   "functions": {
     "api/payout.js": {
-      "includeFiles": "node_modules/@unicitylabs/**"
+      "includeFiles": "node_modules/**"
     }
   }
 }
