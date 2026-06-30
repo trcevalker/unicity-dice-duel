@@ -262,7 +262,7 @@ flipBtn.addEventListener('click', async () => {
     } else {
       setStatus(gameStatus, `❌ Could not place bet: ${betErr.message}`, 'error');
     }
-    resetBtn(flipBtn, '🪙 Flip Coin & Bet');
+    resetBtn(flipBtn, '🎯 Flip Coin & Bet');
     return;
   }
 
@@ -291,7 +291,7 @@ flipBtn.addEventListener('click', async () => {
 
   await new Promise(r => setTimeout(r, 1000));
 
-  setStatus(gameStatus, `🪙 Landed on ${result}. Processing…`, 'info');
+  setStatus(gameStatus, `🎯 Landed on ${result}. Processing…`, 'info');
 
   try {
     if (won) {
@@ -340,5 +340,5 @@ flipBtn.addEventListener('click', async () => {
     setStatus(gameStatus, `❌ Error: ${err.message}`, 'error');
   }
 
-  resetBtn(flipBtn, '🪙 Flip Coin & Bet');
+  resetBtn(flipBtn, '🎯 Flip Coin & Bet');
 });
