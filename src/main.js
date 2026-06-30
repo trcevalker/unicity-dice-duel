@@ -5,13 +5,9 @@
 // ============================================================
 
 import { autoConnect } from '@unicitylabs/sphere-sdk/connect/browser';
-import { NETWORKS, Sphere } from '@unicitylabs/sphere-sdk';
-import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
+import { NETWORKS } from '@unicitylabs/sphere-sdk';
 
-// testnet2 gateway key — published as non-secret by Unicity (sphere-sdk .env.example).
-const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
 const BOT_NAMETAG = 'dicebot2';
-const BOT_MNEMONIC = import.meta.env.VITE_BOT_MNEMONIC;
 const PAYOUT_URL = import.meta.env.VITE_PAYOUT_URL || '/api/payout';
 const MIN_BET_UCT = 0.1;
 const MAX_BET_UCT = 10;
@@ -23,7 +19,6 @@ const connectBtn     = $('connectBtn');
 const walletInfoDiv  = $('walletInfo');
 const identityLabel  = $('identityLabel');
 const balanceBadge   = $('balanceBadge');
-const botBalanceBadge = $('botBalanceBadge');
 const walletStatus   = $('walletStatus');
 const gameCard       = $('gameCard');
 const refreshBalanceBtn = $('refreshBalanceBtn');
@@ -44,7 +39,6 @@ const historyList = $('historyList');
 // ── State ───────────────────────────────────────────────────
 let client = null;       // user's ConnectClient (via Sphere Wallet extension/popup)
 let myNametag = '';
-let botSphere = null;    // bot's own Sphere instance — signs/sends autonomously
 let choice = null;       // 'heads' | 'tails'
 let stats = { wins: 0, losses: 0 };
 let uctCoinId = null;     // real hex coinId for UCT, read from sphere_getBalance
@@ -101,55 +95,6 @@ async function updateBalance() {
   }
 }
 
-// Lists every callable method on an object's prototype chain — used to debug
-// what's actually available when an expected method misbehaves.
-function listMethods(obj) {
-  const methods = new Set();
-  let proto = obj;
-  while (proto && proto !== Object.prototype) {
-    for (const name of Object.getOwnPropertyNames(proto)) {
-      if (typeof obj[name] === 'function') methods.add(name);
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-  return Array.from(methods);
-}
-
-// Resolves a real hex coinId from the bot's own assets/tokens.
-// Priority: getAssets() → getTokens() → cached uctCoinId from user's wallet.
-async function resolveBotUctCoinId() {
-  if (!botSphere) return uctCoinId || null;
-
-  // 1. Try getAssets() — aggregated balance view (async)
-  try {
-    const assets = await botSphere.payments.getAssets?.();
-    console.log('[bot] payments.getAssets():', assets);
-    if (Array.isArray(assets) && assets.length > 0) {
-      const uct = assets.find(a => a.symbol === 'UCT') ?? assets[0];
-      console.log('[bot] coinId from getAssets():', uct.coinId, 'symbol:', uct.symbol);
-      return uct.coinId;
-    }
-  } catch (e) {
-    console.error('[bot] getAssets() failed:', e.message);
-  }
-
-  // 2. Try getTokens() — individual token UTXOs (sync)
-  try {
-    const tokens = botSphere.payments.getTokens();
-    console.log('[bot] payments.getTokens():', tokens);
-    if (Array.isArray(tokens) && tokens.length > 0) {
-      console.log('[bot] coinId from getTokens():', tokens[0].coinId, 'symbol:', tokens[0].symbol);
-      return tokens[0].coinId;
-    }
-  } catch (e) {
-    console.error('[bot] getTokens() failed:', e.message);
-  }
-
-  // 3. Fall back to the coinId resolved from the user's own wallet (same coin)
-  console.warn('[bot] getAssets() and getTokens() both empty — using user wallet coinId:', uctCoinId);
-  return uctCoinId || null;
-}
-
 function renderHistory() {
   if (history.length === 0) {
     historyList.innerHTML = '<span class="history-empty">No games yet</span>';
@@ -200,63 +145,6 @@ function fireConfetti() {
   setTimeout(() => container.remove(), 3200);
 }
 
-// The bot has no ConnectClient, so there's no RPC layer to call the
-// `sphere_getBalance` wire method through — payments.getBalance() is the
-// same underlying call that method wraps on the wallet side.
-async function updateBotBalance() {
-  if (!botSphere) return;
-  try {
-    const assets = await botSphere.payments.getAssets?.() ?? botSphere.payments.getBalance('UCT');
-    console.log('[bot] payments.getAssets():', assets);
-    botBalanceBadge.textContent = `${formatUctAssets(assets)} UCT`;
-  } catch (e) {
-    console.error('[bot] getAssets/getBalance failed:', e);
-    botBalanceBadge.textContent = `⚠️ Balance unavailable: ${e.message}`;
-  }
-  await resolveBotUctCoinId();
-}
-
-// ── Bot wallet (autonomous signer — no human approval needed) ──
-async function initBot() {
-  if (!BOT_MNEMONIC) {
-    console.error('VITE_BOT_MNEMONIC is not set — bot cannot pay out winnings.');
-    botBalanceBadge.textContent = '⚠️ Bot not configured (no mnemonic)';
-    return;
-  }
-  console.log('[bot] initializing Sphere.init() with mnemonic:', BOT_MNEMONIC);
-  try {
-    const providers = createBrowserProviders({
-      network: 'testnet2',
-      oracle: { apiKey: TESTNET2_API_KEY },
-    });
-    const { sphere, created } = await Sphere.init({
-      ...providers,
-      network: 'testnet2',
-      mnemonic: BOT_MNEMONIC,
-    });
-    botSphere = sphere;
-    console.log('[bot] Sphere.init() succeeded. created:', created, 'nametag:', sphere.identity?.nametag, 'identity:', sphere.identity);
-    console.log(`[bot] nametag: @${sphere.identity?.nametag}  address: ${sphere.identity?.directAddress}`);
-    if (sphere.identity?.nametag !== BOT_NAMETAG) {
-      console.error(`[bot] WARNING: wallet's nametag "${sphere.identity?.nametag}" does not match expected "${BOT_NAMETAG}"`);
-    }
-    // Sync first so incoming transfers are visible before querying balance/tokens.
-    try {
-      await sphere.payments.sync?.();
-      console.log('[bot] payments.sync() done');
-    } catch (syncErr) {
-      console.warn('[bot] payments.sync() failed:', syncErr.message);
-    }
-    // Wait briefly for relay discovery to settle, then read balance.
-    await new Promise(r => setTimeout(r, 3000));
-    updateBotBalance();
-  } catch (e) {
-    console.error('[bot] Sphere.init() failed:', e);
-    botBalanceBadge.textContent = `⚠️ Bot init failed: ${e.message}`;
-  }
-}
-initBot();
-
 // ── Connect to Sphere Wallet ──────────────────────────────────
 // autoConnect() picks the best transport itself: extension if installed,
 // iframe if embedded, otherwise a wallet popup at walletUrl.
@@ -286,7 +174,6 @@ connectBtn.addEventListener('click', async () => {
     identityLabel.textContent = `@${myNametag}`;
     setStatus(walletStatus, `✅ Connected as @${myNametag}`, 'success');
     await updateBalance();
-    updateBotBalance();
 
   } catch (err) {
     resetBtn(connectBtn, '🔌 Connect Sphere Wallet');
@@ -303,7 +190,6 @@ connectBtn.addEventListener('click', async () => {
 
 refreshBalanceBtn?.addEventListener('click', () => {
   updateBalance();
-  updateBotBalance();
 });
 
 // ── Choice selection ────────────────────────────────────────
@@ -393,9 +279,6 @@ flipBtn.addEventListener('click', async () => {
           txInfo.innerHTML = `📝 TX: ${data.tx.id}`;
           txInfo.classList.remove('hidden');
         }
-        if (data.botBalance !== undefined) {
-          botBalanceBadge.textContent = `${Number(data.botBalance) / 10 ** (uctDecimals ?? 18)} UCT`;
-        }
         await updateBalance();
       } catch (payErr) {
         console.error('Bot payout failed', payErr);
@@ -433,7 +316,6 @@ flipBtn.addEventListener('click', async () => {
           txInfo.classList.remove('hidden');
         }
         await updateBalance();
-        updateBotBalance();
 
       } catch (payErr) {
         console.error('client.intent("send") failed', payErr);
