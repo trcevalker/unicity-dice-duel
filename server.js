@@ -72,8 +72,14 @@ app.post('/payout', async (req, res) => {
     }
     console.log('[payout] minted token:', mintResult.tokenId, 'amount:', amount);
 
+    const assetsBefore = await botSphere.payments.getAssets?.().catch(() => []);
+    console.log('[payout] getAssets() before send():', JSON.stringify(assetsBefore));
+
     const tx = await botSphere.payments.send({ recipient, coinId, amount: String(amount) });
     console.log('[payout] send() succeeded tx:', JSON.stringify(tx));
+
+    const assetsAfter = await botSphere.payments.getAssets?.().catch(() => []);
+    console.log('[payout] getAssets() after send():', JSON.stringify(assetsAfter));
 
     return res.json({ ok: true, tx });
   } catch (e) {
