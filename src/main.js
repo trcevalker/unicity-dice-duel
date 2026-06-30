@@ -202,6 +202,11 @@ headsBtn.addEventListener('click', () => selectChoice('heads'));
 tailsBtn.addEventListener('click', () => selectChoice('tails'));
 
 // ── Game logic ───────────────────────────────────────────────
+// Bet flow: the bet amount is sent to the bot UP FRONT (approved by the
+// player), and only THEN does the coin flip happen. If the player rejects
+// that approval, the game never starts. On a win, the bot sends back 2x
+// the bet (the original stake plus the winnings); on a loss, the bot
+// already has the money and nothing further is needed.
 flipBtn.addEventListener('click', async () => {
   if (!client) return;
 
@@ -228,11 +233,47 @@ flipBtn.addEventListener('click', async () => {
     setStatus(gameStatus, '❌ Could not resolve UCT token info from your wallet balance.', 'error');
     return;
   }
+  if (!client?.isConnected) {
+    setStatus(gameStatus, '❌ Wallet is not connected — reconnect and try again.', 'error');
+    return;
+  }
   const bet = Math.round(betUct * 10 ** uctDecimals);
 
-  spinner(flipBtn, 'Flipping…');
+  spinner(flipBtn, 'Waiting for approval…');
   resultBanner.className = 'result-banner';
   txInfo.classList.add('hidden');
+  setStatus(gameStatus, `⏳ Approve sending ${betUct} UCT to @${BOT_NAMETAG} to place your bet…`, 'info');
+
+  // Bet goes to the bot first — approve in your Sphere wallet. Rejecting
+  // this cancels the game before anything else happens.
+  let betTx;
+  try {
+    // Use extension intent — pops up approval in Sphere extension.
+    // Wire param is `to`, not `recipient` (Sphere Connect protocol).
+    betTx = await client.intent('send', {
+      to: `@${BOT_NAMETAG}`,
+      amount: String(bet),
+      coinId: uctCoinId,
+    });
+  } catch (betErr) {
+    console.error('client.intent("send") failed', betErr);
+    if (betErr.message?.includes('rejected') || betErr.message?.includes('denied')) {
+      setStatus(gameStatus, '❌ Bet cancelled — you rejected the approval.', 'error');
+    } else {
+      setStatus(gameStatus, `❌ Could not place bet: ${betErr.message}`, 'error');
+    }
+    resetBtn(flipBtn, '🪙 Flip Coin & Bet');
+    return;
+  }
+
+  await updateBalance();
+  if (betTx?.id) {
+    txInfo.innerHTML = `📝 Bet TX: <a href="https://explorer.unicity.network/tx/${betTx.id}" target="_blank">View on Explorer</a>`;
+    txInfo.classList.remove('hidden');
+  }
+
+  spinner(flipBtn, 'Flipping…');
+  setStatus(gameStatus, `✅ Bet placed! Flipping…`, 'info');
 
   const result = crypto.getRandomValues(new Uint32Array(1))[0] % 2 === 0 ? 'heads' : 'tails';
   const won = result === choice;
@@ -261,22 +302,24 @@ flipBtn.addEventListener('click', async () => {
       recordHistory({ win: true, coinResult: result, betUct });
       fireConfetti();
 
-      setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${betUct} UCT…`, 'info');
+      // Bot returns the stake plus the winnings — 2x the bet.
+      const payout = bet * 2;
+      const payoutUct = betUct * 2;
+      setStatus(gameStatus, `⏳ @${BOT_NAMETAG} is sending you ${payoutUct} UCT…`, 'info');
 
       try {
-        if (!uctCoinId) throw new Error('Could not resolve UCT coinId — connect wallet first');
-        console.log('[payout] calling /api/payout recipient:', myNametag, 'amount:', bet, 'coinId:', uctCoinId);
+        console.log('[payout] calling payout endpoint recipient:', myNametag, 'amount:', payout, 'coinId:', uctCoinId);
         const res = await fetch(PAYOUT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ recipient: `@${myNametag}`, amount: String(bet), coinId: uctCoinId }),
+          body: JSON.stringify({ recipient: `@${myNametag}`, amount: String(payout), coinId: uctCoinId }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Payout API error ${res.status}`);
 
-        setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${betUct} UCT! (may take a moment to appear in your wallet)`, 'success');
+        setStatus(gameStatus, `✅ @${BOT_NAMETAG} sent you ${payoutUct} UCT! (may take a moment to appear in your wallet)`, 'success');
         if (data.tx?.id) {
-          txInfo.innerHTML = `📝 TX: ${data.tx.id}`;
+          txInfo.innerHTML = `📝 Payout TX: ${data.tx.id}`;
           txInfo.classList.remove('hidden');
         }
         await updateBalance();
@@ -291,40 +334,7 @@ flipBtn.addEventListener('click', async () => {
       stats.losses++;
       lossesCount.textContent = stats.losses;
       recordHistory({ win: false, coinResult: result, betUct });
-
-      if (!client?.isConnected) {
-        console.error('Cannot send intent: ConnectClient is not connected', client);
-        setStatus(gameStatus, '❌ Wallet is not connected — reconnect and try again.', 'error');
-        resetBtn(flipBtn, '🪙 Flip Coin & Bet');
-        return;
-      }
-
-      setStatus(gameStatus, `⏳ Sending ${betUct} UCT to @${BOT_NAMETAG}…`, 'info');
-
-      try {
-        // Use extension intent — pops up approval in Sphere extension.
-        // Wire param is `to`, not `recipient` (Sphere Connect protocol).
-        const tx = await client.intent('send', {
-          to: `@${BOT_NAMETAG}`,
-          amount: String(bet),
-          coinId: uctCoinId,
-        });
-
-        setStatus(gameStatus, `✅ Sent ${betUct} UCT to @${BOT_NAMETAG}!`, 'success');
-        if (tx?.id) {
-          txInfo.innerHTML = `📝 TX: <a href="https://explorer.unicity.network/tx/${tx.id}" target="_blank">View on Explorer</a>`;
-          txInfo.classList.remove('hidden');
-        }
-        await updateBalance();
-
-      } catch (payErr) {
-        console.error('client.intent("send") failed', payErr);
-        if (payErr.message?.includes('rejected') || payErr.message?.includes('denied')) {
-          setStatus(gameStatus, `⚠️ Payment rejected in Sphere extension. You lost but didn't pay!`, 'error');
-        } else {
-          setStatus(gameStatus, `⚠️ Payment failed: ${payErr.message}`, 'error');
-        }
-      }
+      setStatus(gameStatus, `Your bet of ${betUct} UCT stays with @${BOT_NAMETAG}. Better luck next flip!`, 'info');
     }
   } catch (err) {
     setStatus(gameStatus, `❌ Error: ${err.message}`, 'error');

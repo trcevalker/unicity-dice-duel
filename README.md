@@ -9,11 +9,13 @@ A coin-flip betting game against a house bot, built on **Unicity** using the **S
 
 ## What It Does
 
-You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Heads or Tails. The result is decided randomly:
+You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Heads or Tails. Your bet is collected **before** the flip:
 
-- ✅ **You win** → the bot (`@dicebot2`) automatically sends you the bet amount — no approval needed on its side, it signs autonomously
-- ✅ **You lose** → you approve sending the bet amount to `@dicebot2` via your Sphere wallet
-- ✅ Win/loss stats tracked per session
+1. You approve sending the bet amount to the bot (`@dicebot2`) via your Sphere wallet — reject this and the game never starts
+2. The coin flips and the result is decided randomly
+3. ✅ **You win** → the bot automatically sends back **2x your bet** (stake + winnings) — no approval needed on its side, it signs autonomously
+4. ❌ **You lose** → nothing further happens, your bet already went to the bot in step 1
+5. Win/loss stats tracked per session
 
 ---
 
@@ -65,7 +67,8 @@ npm run build
 1. Open the app and connect your Sphere wallet (extension, iframe, or popup)
 2. Enter a bet amount in UCT base units
 3. Pick Heads or Tails
-4. Click **Flip Coin & Bet** — if you win, `@dicebot2` pays you automatically; if you lose, approve the send in your wallet
+4. Click **Flip Coin & Bet** — approve the bet send in your Sphere wallet (rejecting cancels the game)
+5. The coin flips — if you win, `@dicebot2` automatically sends back 2x your bet; if you lose, your bet stays with the bot
 
 ---
 
