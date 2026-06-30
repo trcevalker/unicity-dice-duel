@@ -26,6 +26,16 @@ async function initBot() {
     dataDir: DATA_DIR,
     tokensDir: path.join(DATA_DIR, 'tokens'),
     oracle: { apiKey: TESTNET2_API_KEY },
+    transport: { debug: true },
+    debug: true,
+  });
+
+  console.log('[bot] transport relays:', JSON.stringify(providers.transport?.relays ?? providers.transport));
+
+  // Raw listener directly on the transport, bypassing the Payments module,
+  // to see if ANY token-transfer event ever reaches this process at all.
+  providers.transport.onTokenTransfer?.((transfer) => {
+    console.log('[bot] RAW onTokenTransfer fired:', JSON.stringify(transfer));
   });
 
   const { sphere } = await Sphere.init({ ...providers, network: 'testnet2', mnemonic });
@@ -43,7 +53,8 @@ async function initBot() {
       await sphere.payments.sync?.();
       const assets = await sphere.payments.getAssets?.().catch(() => []);
       const uct = Array.isArray(assets) ? assets.find(a => a.symbol === 'UCT') : null;
-      console.log('[bot] heartbeat — UCT balance:', uct ? uct.totalAmount : '0');
+      console.log('[bot] heartbeat — UCT balance:', uct ? uct.totalAmount : '0',
+                  'transport connected:', providers.transport?.isConnected?.());
     } catch (e) {
       console.warn('[bot] heartbeat sync failed:', e.message);
     }
