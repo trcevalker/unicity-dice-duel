@@ -22,10 +22,11 @@ You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Head
 | Layer | Tech |
 |-------|------|
 | SDK | `@unicitylabs/sphere-sdk` v0.10.1 |
-| Frontend | Vanilla JS + Vite |
+| Frontend | Vanilla JS + Vite, deployed on Vercel |
+| Bot server | Node.js/Express, deployed on Railway (persistent process) |
 | Network | testnet2 |
 | Identity | Sphere nametags (`@handle`) |
-| Payments | `ConnectClient.intent('send', …)` (you) / `sphere.payments.send()` (bot) |
+| Payments | `ConnectClient.intent('send', …)` (you) / `sphere.payments.send()` (bot, server-side) |
 
 ---
 
@@ -35,21 +36,26 @@ You connect your Sphere wallet, choose a bet amount (0.1–10 UCT) and call Head
 # 1. Install dependencies
 npm install
 
-# 2. Set the bot wallet mnemonic (see "Bot Wallet" below)
-echo "VITE_BOT_MNEMONIC=your twelve words..." > .env
-
-# 3. Start dev server
+# 2. Frontend dev server
 npm run dev
+# Open http://localhost:5173 — payout calls hit the deployed Railway bot
+# server by default (see VITE_PAYOUT_URL below), so wins work without
+# running the bot server locally.
 
-# 4. Open http://localhost:5173
+# 3. (Optional) Run the bot server locally too
+echo "BOT_MNEMONIC=your twelve words..." > .env
+npm start
+# Then set VITE_PAYOUT_URL=http://localhost:3001/payout to point the
+# frontend at your local bot instead of the Railway deployment.
 ```
 
 ## Build for Production
 
 ```bash
 npm run build
-# Deploy the dist/ folder to any static host (Vercel, Netlify, GitHub Pages)
-# VITE_BOT_MNEMONIC must be set in the build environment (e.g. a GitHub Actions secret)
+# Deploy dist/ to any static host. VITE_PAYOUT_URL must point at a running
+# bot server (see "Payout Architecture" below); falls back to the Railway
+# deployment if unset.
 ```
 
 ---
@@ -63,25 +69,24 @@ npm run build
 
 ---
 
-## Bot Wallet
+## Payout Architecture
 
-`@dicebot2` is a real testnet2 wallet whose mnemonic is loaded directly in the browser via `Sphere.init()` (not through Connect/extension), so it can sign and send `payments.send()` autonomously when it loses — no human approval step exists for the bot.
+The bot (`@dicebot2`) runs as a **persistent Node.js process on Railway** (`server.js`), not in the browser. The frontend calls it over HTTP:
 
-⚠️ **This means the bot's mnemonic ships inside the public JS bundle.** Anyone can read it from DevTools and drain the bot's wallet. This is acceptable here only because the funds are testnet2 tokens with no real value. Never reuse this pattern with a mainnet-funded wallet.
-
-The bot needs a UCT balance to pay out wins — fund `@dicebot2`'s address from another testnet2 wallet if its balance runs low (shown in the app under "🤖 @dicebot2 balance").
-
-```js
-import { Sphere } from '@unicitylabs/sphere-sdk';
-import { createBrowserProviders } from '@unicitylabs/sphere-sdk/impl/browser';
-
-const { sphere } = await Sphere.init({
-  ...createBrowserProviders({ network: 'testnet2', oracle: { apiKey: 'sk_...' } }),
-  mnemonic: import.meta.env.VITE_BOT_MNEMONIC,
-});
-
-await sphere.payments.send({ recipient: '@player', coinId: 'UCT', amount: '100000' });
 ```
+Frontend (Vercel)  →  POST /payout  →  Bot server (Railway, always-on)
+```
+
+**Why server-side, and why persistent (not serverless):** Unicity tokens are transferred peer-to-peer over a Nostr relay. A recipient only "sees" an incoming transfer if its wallet is actively subscribed to the relay at the moment the transfer is published — there's no way to retroactively discover a transfer after the fact. The Sphere browser extension keeps a permanent background connection, so it always catches transfers. A serverless function (Vercel) cold-starts on each request and can't maintain that subscription, so it never saw funds sent to the bot. We confirmed this directly: querying the relay for every event ever addressed to `@dicebot2`'s pubkey turned up zero `TOKEN_TRANSFER` events, even seconds after a transfer was sent live while a persistent server was connected and listening.
+
+**Why self-mint instead of pre-funding the bot:** Testnet2 has no faucet endpoint, and (per the discovery above) funding the bot via a normal wallet-to-wallet transfer isn't reliably observable by the SDK anyway. The SDK exposes `payments.mintFungibleToken(coinId, amount)`, which mints a fresh, already-local, already-spendable token directly into the calling wallet — no network discovery needed. So on every win, the bot:
+
+1. **Self-mints** exactly the payout amount (`mintFungibleToken`)
+2. **Immediately sends** that freshly-minted token to the winner (`payments.send`)
+
+This was verified end-to-end: `getAssets()` logged before/after `send()` shows the bot's balance going from the freshly-minted amount down to zero, and the returned transaction is a real signed, aggregator-certified state-transition (not a local stub).
+
+⚠️ The bot's mnemonic lives only in the Railway server's environment variable (`BOT_MNEMONIC`) — it is **not** part of the public JS bundle. Self-minting is acceptable only because these are worthless testnet2 tokens; never reuse this pattern against a mainnet token contract.
 
 ---
 

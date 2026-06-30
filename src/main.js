@@ -8,7 +8,7 @@ import { autoConnect } from '@unicitylabs/sphere-sdk/connect/browser';
 import { NETWORKS } from '@unicitylabs/sphere-sdk';
 
 const BOT_NAMETAG = 'dicebot2';
-const PAYOUT_URL = import.meta.env.VITE_PAYOUT_URL || '/api/payout';
+const PAYOUT_URL = import.meta.env.VITE_PAYOUT_URL || 'https://unicity-dice-duel-production.up.railway.app/payout';
 const MIN_BET_UCT = 0.1;
 const MAX_BET_UCT = 10;
 
