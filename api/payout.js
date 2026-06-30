@@ -1,11 +1,13 @@
 import { Sphere } from '@unicitylabs/sphere-sdk';
-import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
+import { createNodeProviders, createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
 import path from 'path';
 
 const TESTNET2_API_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
+// Testnet2 wallet-api gateway — backs hydrateHistoryFromServer() so the bot
+// can see tokens it received even across cold starts.
+const TESTNET2_GATEWAY_URL = 'https://gateway.testnet2.unicity.network';
 const DATA_DIR = '/tmp/bot-wallet';
 
-// Cache sphere instance across warm invocations of the same function container.
 let cachedSphere = null;
 
 async function getBot() {
@@ -14,11 +16,20 @@ async function getBot() {
   const mnemonic = process.env.BOT_MNEMONIC;
   if (!mnemonic) throw new Error('BOT_MNEMONIC env var is not set');
 
-  const providers = createNodeProviders({
+  // Base file-backed providers (relay transport, aggregator, local storage).
+  const base = createNodeProviders({
     network: 'testnet2',
     dataDir: DATA_DIR,
     tokensDir: path.join(DATA_DIR, 'tokens'),
     oracle: { apiKey: TESTNET2_API_KEY },
+  });
+
+  // Overlay wallet-API providers: adds `walletApi` dep + server-backed
+  // tokenStorage so hydrateHistoryFromServer() can pull token history from the
+  // oracle backend instead of failing with "undefined.listHistory".
+  const providers = createWalletApiProviders(base, {
+    baseUrl: TESTNET2_GATEWAY_URL,
+    network: 'testnet2',
   });
 
   const { sphere } = await Sphere.init({
@@ -27,9 +38,20 @@ async function getBot() {
     mnemonic,
   });
 
-  // Pull any historical/pending incoming transfers from the aggregator.
-  try { await sphere.payments.hydrateHistoryFromServer?.(); } catch (_) {}
-  try { await sphere.payments.sync?.(); } catch (_) {}
+  // Pull historical token transfers from oracle backend (uses walletApi.listHistory).
+  try {
+    await sphere.payments.hydrateHistoryFromServer?.();
+    console.log('[payout] hydrateHistoryFromServer done');
+  } catch (e) {
+    console.warn('[payout] hydrateHistoryFromServer failed:', e.message);
+  }
+
+  try {
+    await sphere.payments.sync?.();
+    console.log('[payout] sync done');
+  } catch (e) {
+    console.warn('[payout] sync failed:', e.message);
+  }
 
   cachedSphere = sphere;
   return sphere;
@@ -51,7 +73,6 @@ export default async function handler(req, res) {
   try {
     const sphere = await getBot();
 
-    // Log bot's current token state before attempting send.
     const assets = await sphere.payments.getAssets?.().catch(() => []);
     console.log('[payout] bot assets before send:', JSON.stringify(assets));
 
@@ -65,7 +86,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, tx, botBalance });
   } catch (e) {
-    // Reset cached instance on failure so next request gets a fresh sync.
     cachedSphere = null;
     console.error('[payout] failed:', e.message);
     return res.status(500).json({ error: e.message });
