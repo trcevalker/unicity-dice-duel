@@ -234,7 +234,7 @@ flipBtn.addEventListener('click', async () => {
     return;
   }
   if (!client?.isConnected) {
-    setStatus(gameStatus, '❌ Wallet is not connected — reconnect and try again.', 'error');
+    setStatus(gameStatus, '❌ Wallet is not connected. Reconnect and try again.', 'error');
     return;
   }
   const bet = Math.round(betUct * 10 ** uctDecimals);
@@ -258,7 +258,7 @@ flipBtn.addEventListener('click', async () => {
   } catch (betErr) {
     console.error('client.intent("send") failed', betErr);
     if (betErr.message?.includes('rejected') || betErr.message?.includes('denied')) {
-      setStatus(gameStatus, '❌ Bet cancelled — you rejected the approval.', 'error');
+      setStatus(gameStatus, '❌ Bet cancelled. You rejected the approval.', 'error');
     } else {
       setStatus(gameStatus, `❌ Could not place bet: ${betErr.message}`, 'error');
     }
