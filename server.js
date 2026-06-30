@@ -1,3 +1,8 @@
+import { webcrypto } from 'node:crypto';
+// Some Node versions (Railway's Nixpacks default included) don't expose the
+// Web Crypto API as a bare global yet — the SDK's uuid dependency needs it.
+if (!globalThis.crypto) globalThis.crypto = webcrypto;
+
 import express from 'express';
 import { Sphere } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';

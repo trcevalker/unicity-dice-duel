@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A peer-to-peer dice betting game on Unicity testnet using Sphere SDK",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
